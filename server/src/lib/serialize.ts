@@ -13,7 +13,12 @@ export function serializeBeer(beer: BeerWithBrewery, matchPercent: number | null
     ibu: beer.ibu,
     description: beer.description,
     imageUrl: beer.imageUrl,
-    brewery: { id: beer.brewery.id, name: beer.brewery.name, country: beer.brewery.country },
+    brewery: {
+      id: beer.brewery.id,
+      name: beer.brewery.name,
+      country: beer.brewery.country,
+      logoUrl: beer.brewery.logoUrl,
+    },
     tasteProfile: tasteVector(beer),
     foodPairings: JSON.parse(beer.foodPairings) as string[],
     matchPercent,

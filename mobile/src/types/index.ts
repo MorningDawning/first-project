@@ -24,7 +24,7 @@ export type BeerSummary = {
   ibu: number | null;
   description: string;
   imageUrl: string | null;
-  brewery: { id: string; name: string; country: string };
+  brewery: { id: string; name: string; country: string; logoUrl?: string | null };
   tasteProfile: TasteProfile;
   foodPairings: string[];
   matchPercent: number | null;

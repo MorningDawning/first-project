@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,20 +20,27 @@ import { Button } from "../components/Button";
 import { BeerCard } from "../components/BeerCard";
 import { beersApi, tasteProfileApi } from "../api/beervia";
 import { apiErrorMessage } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 import { colors, radius, spacing, typography } from "../theme/colors";
 import { BeerDetail, TasteProfile } from "../types";
 
 type RouteParams = { beerId: string };
 
+const HERO_HEIGHT = 220;
+const BOTTLE_SIZE = 92;
+
 export function BeerDetailScreen() {
   const route = useRoute();
   const navigation = useNavigation<NativeStackNavigationProp<Record<string, object | undefined>>>();
   const { beerId } = route.params as RouteParams;
+  const { user } = useAuth();
 
   const [beer, setBeer] = useState<BeerDetail | null>(null);
   const [userProfile, setUserProfile] = useState<TasteProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [heroFailed, setHeroFailed] = useState(false);
+  const [bottleFailed, setBottleFailed] = useState(false);
 
   const [myRating, setMyRating] = useState(0);
   const [myText, setMyText] = useState("");
@@ -45,24 +53,32 @@ export function BeerDetailScreen() {
       const [detail, taste] = await Promise.all([beersApi.detail(beerId), tasteProfileApi.get()]);
       setBeer(detail);
       setUserProfile(taste.profile);
+      const own = detail.reviews.find((r) => r.user.id === user?.id);
+      if (own) {
+        setMyRating(own.rating);
+        setMyText(own.text ?? "");
+      }
     } catch (e) {
       setError(apiErrorMessage(e, "Не удалось загрузить пиво"));
     } finally {
       setLoading(false);
     }
-  }, [beerId]);
+  }, [beerId, user?.id]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function submitReview() {
-    if (!beer || myRating === 0) return;
+  const myReview = useMemo(() => beer?.reviews.find((r) => r.user.id === user?.id) ?? null, [beer, user?.id]);
+
+  async function rate(rating: number) {
+    if (!beer) return;
+    setError(null);
+    setMyRating(rating);
     setSubmitting(true);
     try {
-      await beersApi.review(beer.id, myRating, myText.trim() || undefined);
+      await beersApi.review(beer.id, rating, myText.trim() || undefined);
       await load();
-      setMyText("");
     } catch (e) {
       setError(apiErrorMessage(e, "Не удалось сохранить отзыв"));
     } finally {
@@ -70,100 +86,151 @@ export function BeerDetailScreen() {
     }
   }
 
+  async function submitReview() {
+    if (!beer || myRating === 0) return;
+    await rate(myRating);
+  }
+
   if (loading) return <LoadingView label="Загружаем карточку пива…" />;
   if (error || !beer) return <ErrorView message={error ?? "Пиво не найдено"} onRetry={load} />;
 
+  const heroUrl = beer.brewery.logoUrl;
+
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
-        {beer.imageUrl ? (
-          <Image source={{ uri: beer.imageUrl }} style={styles.hero} />
-        ) : (
-          <View style={[styles.hero, styles.heroPlaceholder]}>
-            <Text style={{ fontSize: 48 }}>🍺</Text>
-          </View>
-        )}
+    <Screen style={{ backgroundColor: colors.card }}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          {heroUrl && !heroFailed ? (
+            <Image
+              source={{ uri: heroUrl }}
+              style={StyleSheet.absoluteFill}
+              onError={() => setHeroFailed(true)}
+            />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.heroFallback]} />
+          )}
+          <View style={styles.heroShade} />
 
-        <Text style={styles.name}>{beer.name}</Text>
-        <Text style={styles.brewery}>{beer.brewery.name} · {beer.brewery.country}</Text>
-        <Text style={styles.style}>{beer.style} · {beer.abv}% ABV{beer.ibu ? ` · ${beer.ibu} IBU` : ""}</Text>
-
-        <View style={styles.row}>
-          {beer.matchPercent != null && <MatchBadge percent={beer.matchPercent} />}
           {beer.avgRating != null && (
-            <View style={styles.ratingRow}>
-              <StarRating rating={beer.avgRating} />
-              <Text style={styles.ratingText}>{beer.avgRating} ({beer.reviews.length})</Text>
+            <View style={styles.ratingFloating}>
+              <Text style={styles.ratingFloatingValue}>{beer.avgRating}</Text>
+              <StarRating rating={beer.avgRating} size={12} />
+              <Text style={styles.ratingFloatingCount}>{beer.reviews.length} оценок</Text>
+            </View>
+          )}
+
+          <Text style={styles.heroBreweryLabel} numberOfLines={1}>
+            {beer.brewery.name} · {beer.brewery.country}
+          </Text>
+        </View>
+
+        <View style={styles.bottleWrap}>
+          {beer.imageUrl && !bottleFailed ? (
+            <Image source={{ uri: beer.imageUrl }} style={styles.bottle} onError={() => setBottleFailed(true)} />
+          ) : (
+            <View style={[styles.bottle, styles.bottlePlaceholder]}>
+              <Text style={{ fontSize: 32 }}>🍺</Text>
             </View>
           )}
         </View>
 
-        <Text style={styles.description}>{beer.description}</Text>
+        <View style={styles.body}>
+          <Text style={styles.name}>{beer.name}</Text>
+          <Text style={styles.style}>{beer.style} · {beer.abv}% ABV{beer.ibu ? ` · ${beer.ibu} IBU` : ""}</Text>
 
-        <Text style={styles.sectionTitle}>Вкусовой профиль</Text>
-        <View style={styles.radarWrap}>
-          <TasteRadar profile={beer.tasteProfile} secondaryProfile={userProfile ?? undefined} size={260} />
-          {userProfile && (
-            <View style={styles.legend}>
-              <LegendDot color={colors.primary} label="Это пиво" />
-              <LegendDot color={colors.accent} label="Ваш вкус" />
+          {beer.matchPercent != null && (
+            <View style={{ marginTop: spacing.sm }}>
+              <MatchBadge percent={beer.matchPercent} />
             </View>
           )}
-        </View>
 
-        <Text style={styles.sectionTitle}>Сочетается с</Text>
-        <View style={styles.chips}>
-          {beer.foodPairings.map((food) => (
-            <View key={food} style={styles.chip}>
-              <Text style={styles.chipText}>{food}</Text>
+          <View style={styles.likeRow}>
+            <Text style={styles.likeQuestion}>Вам нравится это пиво?</Text>
+            <View style={styles.likeButtons}>
+              <Pressable
+                onPress={() => rate(2)}
+                disabled={submitting}
+                style={[styles.likeButton, myReview && myReview.rating <= 2 && styles.likeButtonActiveDown]}
+              >
+                <Text style={styles.likeIcon}>👎</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => rate(5)}
+                disabled={submitting}
+                style={[styles.likeButton, myReview && myReview.rating >= 4 && styles.likeButtonActiveUp]}
+              >
+                <Text style={styles.likeIcon}>👍</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <Text style={styles.description}>{beer.description}</Text>
+
+          <Text style={styles.sectionTitle}>Вкусовой профиль</Text>
+          <View style={styles.radarWrap}>
+            <TasteRadar profile={beer.tasteProfile} secondaryProfile={userProfile ?? undefined} size={260} />
+            {userProfile && (
+              <View style={styles.legend}>
+                <LegendDot color={colors.primary} label="Это пиво" />
+                <LegendDot color={colors.accent} label="Ваш вкус" />
+              </View>
+            )}
+          </View>
+
+          <Text style={styles.sectionTitle}>Сочетается с</Text>
+          <View style={styles.chips}>
+            {beer.foodPairings.map((food) => (
+              <View key={food} style={styles.chip}>
+                <Text style={styles.chipText}>{food}</Text>
+              </View>
+            ))}
+          </View>
+
+          {beer.recommendations.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Рекомендации</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.sm }}>
+                {beer.recommendations.map((rec) => (
+                  <View key={rec.id} style={styles.recCard}>
+                    <BeerCard
+                      name={rec.name}
+                      style={rec.style}
+                      breweryName={rec.brewery.name}
+                      imageUrl={rec.imageUrl}
+                      matchPercent={rec.matchPercent}
+                      onPress={() => navigation.push("BeerDetail", { beerId: rec.id })}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          <Text style={styles.sectionTitle}>Ваш отзыв</Text>
+          <View style={styles.reviewForm}>
+            <StarRating rating={myRating} onChange={setMyRating} size={28} />
+            <TextField
+              label="Комментарий (необязательно)"
+              value={myText}
+              onChangeText={setMyText}
+              placeholder="Что понравилось или нет?"
+              multiline
+            />
+            <Button title="Сохранить отзыв" onPress={submitReview} loading={submitting} disabled={myRating === 0} />
+          </View>
+
+          <Text style={styles.sectionTitle}>Отзывы ({beer.reviews.length})</Text>
+          {beer.reviews.length === 0 && <Text style={styles.empty}>Пока никто не оставил отзыв — будьте первым!</Text>}
+          {beer.reviews.map((r) => (
+            <View key={r.id} style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.reviewUser}>{r.user.name}</Text>
+                <StarRating rating={r.rating} size={14} />
+              </View>
+              {r.text && <Text style={styles.reviewText}>{r.text}</Text>}
             </View>
           ))}
         </View>
-
-        {beer.recommendations.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Рекомендации</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.sm }}>
-              {beer.recommendations.map((rec) => (
-                <View key={rec.id} style={styles.recCard}>
-                  <BeerCard
-                    name={rec.name}
-                    style={rec.style}
-                    breweryName={rec.brewery.name}
-                    imageUrl={rec.imageUrl}
-                    matchPercent={rec.matchPercent}
-                    onPress={() => navigation.push("BeerDetail", { beerId: rec.id })}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </>
-        )}
-
-        <Text style={styles.sectionTitle}>Ваш отзыв</Text>
-        <View style={styles.reviewForm}>
-          <StarRating rating={myRating} onChange={setMyRating} size={28} />
-          <TextField
-            label="Комментарий (необязательно)"
-            value={myText}
-            onChangeText={setMyText}
-            placeholder="Что понравилось или нет?"
-            multiline
-          />
-          <Button title="Сохранить отзыв" onPress={submitReview} loading={submitting} disabled={myRating === 0} />
-        </View>
-
-        <Text style={styles.sectionTitle}>Отзывы ({beer.reviews.length})</Text>
-        {beer.reviews.length === 0 && <Text style={styles.empty}>Пока никто не оставил отзыв — будьте первым!</Text>}
-        {beer.reviews.map((r) => (
-          <View key={r.id} style={styles.reviewCard}>
-            <View style={styles.reviewHeader}>
-              <Text style={styles.reviewUser}>{r.user.name}</Text>
-              <StarRating rating={r.rating} size={14} />
-            </View>
-            {r.text && <Text style={styles.reviewText}>{r.text}</Text>}
-          </View>
-        ))}
       </ScrollView>
     </Screen>
   );
@@ -179,29 +246,107 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
-  hero: { width: "100%", height: 200, borderRadius: radius.lg, backgroundColor: colors.card },
-  heroPlaceholder: { alignItems: "center", justifyContent: "center" },
-  name: { ...typography.title, marginTop: spacing.md },
-  brewery: { ...typography.body, color: colors.textMuted },
-  style: { ...typography.caption, marginTop: 2 },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginTop: spacing.md, flexWrap: "wrap" },
-  ratingRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  ratingText: { ...typography.caption },
-  description: { ...typography.body, marginTop: spacing.md, lineHeight: 22 },
-  sectionTitle: { ...typography.heading, marginTop: spacing.lg, marginBottom: spacing.sm },
-  radarWrap: { alignItems: "center" },
+  content: { paddingBottom: spacing.xl * 2 },
+
+  hero: {
+    height: HERO_HEIGHT,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+    overflow: "hidden",
+    backgroundColor: colors.card,
+    justifyContent: "flex-end",
+  },
+  heroFallback: { backgroundColor: colors.primary },
+  heroShade: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(44,24,16,0.28)",
+  },
+  heroBreweryLabel: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md + BOTTLE_SIZE / 2 - 8,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowRadius: 4,
+  },
+
+  ratingFloating: {
+    position: "absolute",
+    top: spacing.md,
+    right: spacing.lg,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+    alignItems: "center",
+    gap: 2,
+  },
+  ratingFloatingValue: { fontSize: 18, fontWeight: "700", color: colors.text },
+  ratingFloatingCount: { fontSize: 10, color: colors.textMuted },
+
+  bottleWrap: {
+    alignItems: "center",
+    marginTop: -(BOTTLE_SIZE / 2),
+  },
+  bottle: {
+    width: BOTTLE_SIZE,
+    height: BOTTLE_SIZE,
+    borderRadius: BOTTLE_SIZE / 2,
+    borderWidth: 4,
+    borderColor: colors.card,
+    backgroundColor: colors.background,
+  },
+  bottlePlaceholder: { alignItems: "center", justifyContent: "center" },
+
+  body: { paddingHorizontal: spacing.lg, alignItems: "center" },
+  name: { ...typography.title, marginTop: spacing.sm, textAlign: "center" },
+  style: { ...typography.caption, marginTop: 2, textAlign: "center" },
+
+  likeRow: {
+    marginTop: spacing.lg,
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    width: "100%",
+  },
+  likeQuestion: { ...typography.body, fontWeight: "600" },
+  likeButtons: { flexDirection: "row", gap: spacing.md },
+  likeButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  likeButtonActiveDown: { borderColor: colors.primary, backgroundColor: "#FBEAE3" },
+  likeButtonActiveUp: { borderColor: colors.success, backgroundColor: "#E9F1EC" },
+  likeIcon: { fontSize: 20 },
+
+  description: { ...typography.body, marginTop: spacing.lg, lineHeight: 22, textAlign: "left", alignSelf: "stretch" },
+  sectionTitle: { ...typography.heading, marginTop: spacing.lg, marginBottom: spacing.sm, alignSelf: "flex-start" },
+  radarWrap: { alignItems: "center", alignSelf: "stretch" },
   legend: { flexDirection: "row", gap: spacing.lg, marginTop: spacing.xs },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendLabel: { ...typography.caption },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, alignSelf: "flex-start" },
   chip: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   chipText: { color: colors.text, fontSize: 13 },
   recCard: { width: 220, marginRight: spacing.sm },
-  reviewForm: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
-  empty: { ...typography.caption },
-  reviewCard: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  reviewForm: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, gap: spacing.sm, alignSelf: "stretch" },
+  empty: { ...typography.caption, alignSelf: "flex-start" },
+  reviewCard: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border, alignSelf: "stretch" },
   reviewHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
   reviewUser: { fontWeight: "700", color: colors.text },
   reviewText: { color: colors.text },

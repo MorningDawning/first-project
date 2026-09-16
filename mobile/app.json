@@ -10,7 +10,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "BeerVia использует камеру, чтобы сканировать этикетки и банки пива."
+        "NSCameraUsageDescription": "BeerVia использует камеру, чтобы сканировать этикетки и банки пива.",
+        "NSPhotoLibraryUsageDescription": "BeerVia использует галерею, чтобы распознать пиво по выбранному фото."
       }
     },
     "android": {
@@ -31,6 +32,12 @@
         "expo-camera",
         {
           "cameraPermission": "BeerVia использует камеру, чтобы сканировать этикетки и банки пива."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BeerVia использует галерею, чтобы распознать пиво по выбранному фото."
         }
       ]
     ]

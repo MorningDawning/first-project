@@ -162,6 +162,19 @@ async function main() {
     beerDefs.map((b) => prisma.beer.create({ data: { ...b, foodPairings: JSON.stringify(b.foodPairings) } }))
   );
 
+  console.log("Фото пивоварен (для шапки карточки пива)...");
+  const byBeerName = (name: string) => beers.find((b) => b.name === name)!;
+  await Promise.all([
+    prisma.brewery.update({ where: { id: severny.id }, data: { logoUrl: byBeerName("Медовый Эль").imageUrl } }),
+    prisma.brewery.update({ where: { id: brewdog.id }, data: { logoUrl: byBeerName("Punk IPA").imageUrl } }),
+    prisma.brewery.update({ where: { id: sierra.id }, data: { logoUrl: byBeerName("Pale Ale").imageUrl } }),
+    prisma.brewery.update({ where: { id: weihen.id }, data: { logoUrl: byBeerName("Hefeweissbier").imageUrl } }),
+    prisma.brewery.update({ where: { id: guinness.id }, data: { logoUrl: byBeerName("Draught").imageUrl } }),
+    prisma.brewery.update({ where: { id: duvel.id }, data: { logoUrl: byBeerName("Duvel").imageUrl } }),
+    prisma.brewery.update({ where: { id: paulaner.id }, data: { logoUrl: byBeerName("Salvator").imageUrl } }),
+    prisma.brewery.update({ where: { id: asahi.id }, data: { logoUrl: byBeerName("Super Dry").imageUrl } }),
+  ]);
+
   console.log("Пользователи...");
   const passwordHash = await bcrypt.hash("demo1234", 10);
   const [demo, anna, igor, maria] = await Promise.all([
