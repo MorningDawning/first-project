@@ -1,0 +1,87 @@
+import React, { useCallback, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { Screen } from "../../components/Screen";
+import { Button } from "../../components/Button";
+import { BeerCard } from "../../components/BeerCard";
+import { useAuth } from "../../context/AuthContext";
+import { beersApi } from "../../api/beervia";
+import { colors, radius, spacing, typography } from "../../theme/colors";
+import { ScanStackParamList } from "../../navigation/types";
+import { BeerSummary } from "../../types";
+
+type Nav = NativeStackNavigationProp<ScanStackParamList, "Home">;
+
+export function HomeScreen() {
+  const navigation = useNavigation<Nav>();
+  const { user } = useAuth();
+  const [recommendations, setRecommendations] = useState<BeerSummary[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      beersApi
+        .search({})
+        .then((beers) => {
+          const withMatch = beers.filter((b) => b.matchPercent != null);
+          withMatch.sort((a, b) => (b.matchPercent ?? 0) - (a.matchPercent ?? 0));
+          setRecommendations(withMatch.slice(0, 4));
+        })
+        .catch(() => {});
+    }, [])
+  );
+
+  const firstName = user?.name?.split(" ")[0];
+
+  return (
+    <Screen>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.greeting}>{firstName ? `Привет, ${firstName}!` : "BeerVia"}</Text>
+        <Text style={styles.subtitle}>Что сегодня пьём?</Text>
+
+        <View style={styles.scanCard}>
+          <Text style={styles.scanTitle}>Отсканировать пиво</Text>
+          <Text style={styles.scanDescription}>
+            Наведите камеру на банку или этикетку — узнаем сорт, вкусовой профиль и насколько это
+            совпадает с вашим вкусом
+          </Text>
+          <Button title="Сканировать" variant="light" onPress={() => navigation.navigate("Camera")} />
+        </View>
+
+        {recommendations.length > 0 && (
+          <View style={styles.recs}>
+            <Text style={styles.sectionTitle}>Рекомендуем по вашему вкусу</Text>
+            {recommendations.map((b) => (
+              <BeerCard
+                key={b.id}
+                name={b.name}
+                style={b.style}
+                breweryName={b.brewery.name}
+                imageUrl={b.imageUrl}
+                matchPercent={b.matchPercent}
+                onPress={() => navigation.navigate("BeerDetail", { beerId: b.id })}
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  greeting: { ...typography.title },
+  subtitle: { ...typography.caption, marginTop: 2, marginBottom: spacing.lg },
+  scanCard: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
+  },
+  scanTitle: { fontSize: 20, fontWeight: "700", color: "#fff" },
+  scanDescription: { fontSize: 14, color: "rgba(255,255,255,0.9)", lineHeight: 20, marginBottom: spacing.sm },
+  recs: {},
+  sectionTitle: { ...typography.heading, marginBottom: spacing.sm },
+});

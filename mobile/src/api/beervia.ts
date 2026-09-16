@@ -37,7 +37,15 @@ export const beersApi = {
 };
 
 export const scanApi = {
-  scan: (barcode?: string) => api.post<BeerDetail>("/scan", { barcode }).then((r) => r.data),
+  /** Uploads a captured label/can photo for recognition. */
+  scan: (photoUri: string) => {
+    const form = new FormData();
+    // React Native's FormData accepts this {uri,name,type} shape for file parts.
+    form.append("photo", { uri: photoUri, name: "scan.jpg", type: "image/jpeg" } as unknown as Blob);
+    return api
+      .post<BeerDetail>("/scan", form, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((r) => r.data);
+  },
 };
 
 export const barApi = {

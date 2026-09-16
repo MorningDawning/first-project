@@ -6,7 +6,8 @@ export type AuthStackParamList = {
 };
 
 export type ScanStackParamList = {
-  ScanHome: undefined;
+  Home: undefined;
+  Camera: undefined;
   BeerDetail: { beerId: string };
 };
 

@@ -1,0 +1,8 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+open_clip_torch==2.26.1
+torch==2.4.1
+scikit-learn==1.5.2
+joblib==1.4.2
+Pillow==10.4.0

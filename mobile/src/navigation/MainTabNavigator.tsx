@@ -11,14 +11,14 @@ import { colors } from "../theme/colors";
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const ICONS: Record<keyof MainTabParamList, string> = {
-  ScanTab: "📷",
+  ScanTab: "🏠",
   LibraryTab: "📚",
   BarTab: "🍻",
   ProfileTab: "👤",
 };
 
 const LABELS: Record<keyof MainTabParamList, string> = {
-  ScanTab: "Сканер",
+  ScanTab: "Главная",
   LibraryTab: "Библиотека",
   BarTab: "Бар",
   ProfileTab: "Профиль",

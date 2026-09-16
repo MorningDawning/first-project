@@ -5,7 +5,7 @@ import { colors, radius, spacing } from "../theme/colors";
 type Props = {
   title: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "outline";
+  variant?: "primary" | "secondary" | "outline" | "light";
   loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
@@ -22,15 +22,18 @@ export function Button({ title, onPress, variant = "primary", loading, disabled,
         variant === "primary" && { backgroundColor: colors.primary },
         variant === "secondary" && { backgroundColor: colors.accent },
         variant === "outline" && { backgroundColor: "transparent", borderWidth: 1.5, borderColor: colors.primary },
+        variant === "light" && { backgroundColor: "#fff" },
         isDisabled && styles.disabled,
         pressed && !isDisabled && styles.pressed,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === "outline" ? colors.primary : "#fff"} />
+        <ActivityIndicator color={variant === "outline" || variant === "light" ? colors.primary : "#fff"} />
       ) : (
-        <Text style={[styles.text, variant === "outline" && { color: colors.primary }]}>{title}</Text>
+        <Text style={[styles.text, (variant === "outline" || variant === "light") && { color: colors.primary }]}>
+          {title}
+        </Text>
       )}
     </Pressable>
   );
