@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  bio          String?
+  createdAt    DateTime @default(now())
+
+  reviews       Review[]
+  scans         ScanHistory[]
+  posts         FriendPost[]
+  friendsFrom   Friendship[]  @relation("FriendshipFrom")
+  friendsTo     Friendship[]  @relation("FriendshipTo")
+}
+
+model Brewery {
+  id          String  @id @default(cuid())
+  name        String
+  country     String
+  city        String?
+  description String?
+  logoUrl     String?
+
+  beers Beer[]
+}
+
+model Beer {
+  id          String  @id @default(cuid())
+  name        String
+  breweryId   String
+  style       String
+  abv         Float
+  ibu         Int?
+  description String
+  imageUrl    String?
+  barcode     String? @unique
+
+  // taste profile axes, 0-100
+  sweetness   Int
+  bitterness  Int
+  sourness    Int
+  body        Int
+  aroma       Int
+
+  foodPairings String // JSON-encoded string array
+
+  brewery Brewery       @relation(fields: [breweryId], references: [id])
+  reviews Review[]
+  scans   ScanHistory[]
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  beerId    String
+  userId    String
+  rating    Int // 1-5
+  text      String?
+  createdAt DateTime @default(now())
+
+  beer Beer @relation(fields: [beerId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([beerId, userId])
+}
+
+model ScanHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  beerId    String
+  scannedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  beer Beer @relation(fields: [beerId], references: [id])
+}
+
+model FriendPost {
+  id        String   @id @default(cuid())
+  userId    String
+  text      String
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  userId    String
+  friendId  String
+  status    String // "pending" | "accepted"
+  createdAt DateTime @default(now())
+
+  user   User @relation("FriendshipFrom", fields: [userId], references: [id])
+  friend User @relation("FriendshipTo", fields: [friendId], references: [id])
+
+  @@unique([userId, friendId])
+}
