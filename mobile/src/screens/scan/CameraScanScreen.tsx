@@ -212,6 +212,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: spacing.xl,
+    alignSelf: "stretch",
   },
   controlsSpacer: { width: 44, height: 44 },
 
