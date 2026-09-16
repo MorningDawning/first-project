@@ -20,6 +20,10 @@ export function CameraScanScreen() {
   const [torch, setTorch] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Останавливаем рендер CameraView сразу после съёмки/выбора фото, не дожидаясь
+  // навигации — иначе нативная камера-сессия иногда остаётся «висеть» в фоне
+  // (iOS показывает системную плашку «вернуться к камере» поверх других экранов).
+  const [cameraActive, setCameraActive] = useState(true);
 
   async function submitPhoto(uri: string) {
     setError(null);
@@ -30,6 +34,7 @@ export function CameraScanScreen() {
       navigation.replace("BeerDetail", { beerId: beer.id });
     } catch (e) {
       setError(apiErrorMessage(e, "Не удалось распознать пиво"));
+      setCameraActive(true);
     } finally {
       setScanning(false);
     }
@@ -38,6 +43,7 @@ export function CameraScanScreen() {
   async function handleCapture() {
     if (!cameraRef.current) return;
     const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+    setCameraActive(false);
     if (!photo) {
       setError("Не удалось сделать снимок");
       return;
@@ -46,18 +52,21 @@ export function CameraScanScreen() {
   }
 
   async function handlePickFromGallery() {
+    setCameraActive(false);
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.7,
     });
     if (!result.canceled && result.assets[0]) {
       await submitPhoto(result.assets[0].uri);
+    } else {
+      setCameraActive(true);
     }
   }
 
   return (
     <View style={styles.root}>
-      {permission?.granted && (
+      {permission?.granted && cameraActive && (
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} />
       )}
 
@@ -156,9 +165,9 @@ const styles = StyleSheet.create({
   },
 
   roundButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(0,0,0,0.45)",
     alignItems: "center",
     justifyContent: "center",
@@ -166,7 +175,7 @@ const styles = StyleSheet.create({
   roundButtonActive: { backgroundColor: colors.accent },
   roundButtonPressed: { opacity: 0.7 },
   roundButtonDisabled: { opacity: 0.4 },
-  roundButtonIcon: { fontSize: 18, color: "#fff" },
+  roundButtonIcon: { fontSize: 18, lineHeight: 20, color: "#fff", textAlign: "center" },
 
   permissionBox: {
     marginHorizontal: spacing.lg,
@@ -204,7 +213,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: spacing.xl,
   },
-  controlsSpacer: { width: 40, height: 40 },
+  controlsSpacer: { width: 44, height: 44 },
 
   shutter: {
     width: SHUTTER_SIZE,

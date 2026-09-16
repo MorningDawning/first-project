@@ -18,6 +18,7 @@ import { StarRating } from "../components/StarRating";
 import { TextField } from "../components/TextField";
 import { Button } from "../components/Button";
 import { BeerCard } from "../components/BeerCard";
+import { BeerArt } from "../components/BeerArt";
 import { beersApi, tasteProfileApi } from "../api/beervia";
 import { apiErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -40,7 +41,6 @@ export function BeerDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [heroFailed, setHeroFailed] = useState(false);
-  const [bottleFailed, setBottleFailed] = useState(false);
 
   const [myRating, setMyRating] = useState(0);
   const [myText, setMyText] = useState("");
@@ -134,13 +134,7 @@ export function BeerDetailScreen() {
         </View>
 
         <View style={styles.bottleWrap}>
-          {beer.imageUrl && !bottleFailed ? (
-            <Image source={{ uri: beer.imageUrl }} style={styles.bottle} onError={() => setBottleFailed(true)} />
-          ) : (
-            <View style={[styles.bottle, styles.bottlePlaceholder]}>
-              <Text style={{ fontSize: 32 }}>🍺</Text>
-            </View>
-          )}
+          <BeerArt name={beer.name} imageUrl={beer.imageUrl} size={BOTTLE_SIZE} shape="circle" style={styles.bottle} />
         </View>
 
         <View style={styles.body}>
@@ -324,7 +318,6 @@ const styles = StyleSheet.create({
     borderColor: colors.card,
     backgroundColor: colors.background,
   },
-  bottlePlaceholder: { alignItems: "center", justifyContent: "center" },
 
   body: { paddingHorizontal: spacing.lg, alignItems: "center" },
   style: { ...typography.caption, marginTop: spacing.sm, textAlign: "center" },

@@ -1,7 +1,8 @@
 import React from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radius, spacing } from "../theme/colors";
 import { MatchBadge } from "./MatchBadge";
+import { BeerArt } from "./BeerArt";
 
 type Props = {
   name: string;
@@ -16,13 +17,7 @@ type Props = {
 export function BeerCard({ name, style, breweryName, imageUrl, matchPercent, subtitle, onPress }: Props) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
-      {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.image} />
-      ) : (
-        <View style={[styles.image, styles.imagePlaceholder]}>
-          <Text style={styles.imagePlaceholderText}>🍺</Text>
-        </View>
-      )}
+      <BeerArt name={name} imageUrl={imageUrl} size={56} />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{name}</Text>
         <Text style={styles.meta} numberOfLines={1}>{breweryName} · {style}</Text>
@@ -45,9 +40,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   pressed: { opacity: 0.8 },
-  image: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: colors.background },
-  imagePlaceholder: { alignItems: "center", justifyContent: "center" },
-  imagePlaceholderText: { fontSize: 24 },
   info: { marginLeft: spacing.sm, flex: 1, gap: 4 },
   name: { fontSize: 15, fontWeight: "700", color: colors.text },
   meta: { fontSize: 13, color: colors.textMuted },
