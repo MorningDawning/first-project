@@ -12,7 +12,7 @@ export function ScanNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerTintColor: colors.text, headerStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Camera" component={CameraScanScreen} options={{ title: "" }} />
+      <Stack.Screen name="Camera" component={CameraScanScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BeerDetail" component={BeerDetailScreen} options={{ title: "" }} />
     </Stack.Navigator>
   );

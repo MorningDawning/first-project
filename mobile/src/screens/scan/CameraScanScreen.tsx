@@ -86,11 +86,11 @@ export function CameraScanScreen() {
         )}
 
         <View style={styles.bottomArea}>
-          {error && (
-            <View style={styles.errorBanner}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
+          <View style={[styles.hintPill, error && styles.hintPillError]}>
+            <Text style={styles.hintText}>
+              {error ?? (scanning ? "Распознаём этикетку…" : "Держите банку ровно в кадре")}
+            </Text>
+          </View>
 
           <View style={styles.controlsRow}>
             <RoundIconButton icon="🖼️" onPress={handlePickFromGallery} disabled={scanning} />
@@ -106,13 +106,6 @@ export function CameraScanScreen() {
               {scanning && <View style={styles.shutterSpinnerRing} />}
             </Pressable>
             <View style={styles.controlsSpacer} />
-          </View>
-
-          <View style={styles.hintSheet}>
-            <View style={styles.hintHandle} />
-            <Text style={styles.hintText}>
-              {scanning ? "Распознаём этикетку…" : "Держите банку ровно в кадре, на весь видоискатель"}
-            </Text>
           </View>
         </View>
       </SafeAreaView>
@@ -193,10 +186,17 @@ const styles = StyleSheet.create({
   cornerBL: { bottom: 0, left: 0, borderBottomWidth: CORNER_THICKNESS, borderLeftWidth: CORNER_THICKNESS, borderBottomLeftRadius: radius.md },
   cornerBR: { bottom: 0, right: 0, borderBottomWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS, borderBottomRightRadius: radius.md },
 
-  bottomArea: { gap: spacing.md, paddingBottom: spacing.sm },
+  bottomArea: { gap: spacing.lg, paddingBottom: spacing.md, alignItems: "center" },
 
-  errorBanner: { marginHorizontal: spacing.lg, backgroundColor: "rgba(192,57,43,0.9)", borderRadius: radius.sm, padding: spacing.sm },
-  errorText: { color: "#fff", textAlign: "center", fontSize: 13 },
+  hintPill: {
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    maxWidth: "85%",
+  },
+  hintPillError: { backgroundColor: "rgba(192,57,43,0.85)" },
+  hintText: { color: "#fff", fontSize: 13, textAlign: "center" },
 
   controlsRow: {
     flexDirection: "row",
@@ -225,17 +225,4 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.primary,
   },
-
-  hintSheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  hintHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: spacing.xs },
-  hintText: { color: colors.text, fontSize: 13, textAlign: "center" },
 });

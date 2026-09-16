@@ -26,7 +26,7 @@ import { BeerDetail, TasteProfile } from "../types";
 
 type RouteParams = { beerId: string };
 
-const HERO_HEIGHT = 220;
+const HERO_HEIGHT = 260;
 const BOTTLE_SIZE = 92;
 
 export function BeerDetailScreen() {
@@ -94,7 +94,10 @@ export function BeerDetailScreen() {
   if (loading) return <LoadingView label="Загружаем карточку пива…" />;
   if (error || !beer) return <ErrorView message={error ?? "Пиво не найдено"} onRetry={load} />;
 
-  const heroUrl = beer.brewery.logoUrl;
+  // Одно и то же фото пива — размытым фоном и чётким кружком. Раньше фон брался
+  // у пивоварни (фото другого её сорта), из-за чего марка «терялась» на фоне
+  // визуально не связанной картинки — теперь и фон, и кружок про именно это пиво.
+  const heroUrl = beer.imageUrl;
 
   return (
     <Screen style={{ backgroundColor: colors.card }}>
@@ -104,6 +107,7 @@ export function BeerDetailScreen() {
             <Image
               source={{ uri: heroUrl }}
               style={StyleSheet.absoluteFill}
+              blurRadius={22}
               onError={() => setHeroFailed(true)}
             />
           ) : (
@@ -119,9 +123,14 @@ export function BeerDetailScreen() {
             </View>
           )}
 
-          <Text style={styles.heroBreweryLabel} numberOfLines={1}>
-            {beer.brewery.name} · {beer.brewery.country}
-          </Text>
+          <View style={styles.heroTextBlock}>
+            <Text style={styles.heroBrewery} numberOfLines={1}>
+              {beer.brewery.name} · {beer.brewery.country}
+            </Text>
+            <Text style={styles.heroName} numberOfLines={2}>
+              {beer.name}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.bottleWrap}>
@@ -135,7 +144,6 @@ export function BeerDetailScreen() {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.name}>{beer.name}</Text>
           <Text style={styles.style}>{beer.style} · {beer.abv}% ABV{beer.ibu ? ` · ${beer.ibu} IBU` : ""}</Text>
 
           {beer.matchPercent != null && (
@@ -263,16 +271,31 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(44,24,16,0.28)",
+    backgroundColor: "rgba(44,24,16,0.45)",
   },
-  heroBreweryLabel: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 14,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md + BOTTLE_SIZE / 2 - 8,
+  heroTextBlock: {
+    position: "absolute",
+    top: spacing.lg,
+    left: spacing.lg,
+    right: "40%",
+    gap: 2,
+  },
+  heroBrewery: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
     textShadowColor: "rgba(0,0,0,0.4)",
     textShadowRadius: 4,
+  },
+  heroName: {
+    color: "#fff",
+    fontSize: 26,
+    fontWeight: "700",
+    lineHeight: 30,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowRadius: 6,
   },
 
   ratingFloating: {
@@ -304,8 +327,7 @@ const styles = StyleSheet.create({
   bottlePlaceholder: { alignItems: "center", justifyContent: "center" },
 
   body: { paddingHorizontal: spacing.lg, alignItems: "center" },
-  name: { ...typography.title, marginTop: spacing.sm, textAlign: "center" },
-  style: { ...typography.caption, marginTop: 2, textAlign: "center" },
+  style: { ...typography.caption, marginTop: spacing.sm, textAlign: "center" },
 
   likeRow: {
     marginTop: spacing.lg,
