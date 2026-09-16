@@ -22,3 +22,15 @@ function resolveDefaultApiUrl(): string {
 }
 
 export const API_URL = resolveDefaultApiUrl();
+
+/**
+ * Beer/brewery photos can be relative paths like "/beer-photos/punk-ipa/001.jpg"
+ * (served straight from the backend — see server/src/index.ts and
+ * server/src/scripts/syncBeerPhotos.ts, which mirrors real photos from the
+ * ML dataset into the app). Resolve those against API_URL; anything already
+ * absolute (or null) passes through unchanged.
+ */
+export function resolveMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return url.startsWith("/") ? `${API_URL}${url}` : url;
+}

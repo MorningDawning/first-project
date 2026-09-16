@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Image, ImageStyle, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { colors } from "../theme/colors";
+import { resolveMediaUrl } from "../api/config";
 
 /**
  * Shows a beer's real photo when one is trustworthy and loads; otherwise a
@@ -35,14 +36,15 @@ type Props = {
 
 export function BeerArt({ name, imageUrl, size, shape = "rounded", style }: Props) {
   const [failed, setFailed] = useState(false);
+  const resolvedUrl = resolveMediaUrl(imageUrl);
 
   const borderRadius = shape === "circle" ? size / 2 : shape === "rounded" ? size * 0.22 : 0;
   const containerStyle: ViewStyle = { width: size, height: size, borderRadius, overflow: "hidden" };
 
-  if (imageUrl && !failed) {
+  if (resolvedUrl && !failed) {
     return (
       <Image
-        source={{ uri: imageUrl }}
+        source={{ uri: resolvedUrl }}
         style={[containerStyle, style] as unknown as StyleProp<ImageStyle>}
         onError={() => setFailed(true)}
       />

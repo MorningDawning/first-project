@@ -11,7 +11,7 @@ export function BarNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerTintColor: colors.text, headerStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="BarHome" component={BarScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="BeerDetail" component={BeerDetailScreen} options={{ title: "" }} />
+      <Stack.Screen name="BeerDetail" component={BeerDetailScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

@@ -21,7 +21,7 @@ export function ProfileNavigator() {
       <Stack.Screen name="BreweryDetail" component={BreweryDetailScreen} options={{ title: "" }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: "Настройки" }} />
       <Stack.Screen name="FriendsFeed" component={FriendsFeedScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="BeerDetail" component={BeerDetailScreen} options={{ title: "" }} />
+      <Stack.Screen name="BeerDetail" component={BeerDetailScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

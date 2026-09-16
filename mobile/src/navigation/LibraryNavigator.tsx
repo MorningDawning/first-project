@@ -11,7 +11,7 @@ export function LibraryNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerTintColor: colors.text, headerStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="LibraryHome" component={LibraryScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="BeerDetail" component={BeerDetailScreen} options={{ title: "" }} />
+      <Stack.Screen name="BeerDetail" component={BeerDetailScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

@@ -22,6 +22,7 @@ import { BeerArt } from "../components/BeerArt";
 import { beersApi, tasteProfileApi } from "../api/beervia";
 import { apiErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { resolveMediaUrl } from "../api/config";
 import { colors, radius, spacing, typography } from "../theme/colors";
 import { BeerDetail, TasteProfile } from "../types";
 
@@ -97,7 +98,7 @@ export function BeerDetailScreen() {
   // Одно и то же фото пива — размытым фоном и чётким кружком. Раньше фон брался
   // у пивоварни (фото другого её сорта), из-за чего марка «терялась» на фоне
   // визуально не связанной картинки — теперь и фон, и кружок про именно это пиво.
-  const heroUrl = beer.imageUrl;
+  const heroUrl = resolveMediaUrl(beer.imageUrl);
 
   return (
     <Screen style={{ backgroundColor: colors.card }}>
@@ -114,6 +115,10 @@ export function BeerDetailScreen() {
             <View style={[StyleSheet.absoluteFill, styles.heroFallback]} />
           )}
           <View style={styles.heroShade} />
+
+          <Pressable onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={8}>
+            <Text style={styles.backButtonIcon}>←</Text>
+          </Pressable>
 
           {beer.avgRating != null && (
             <View style={styles.ratingFloating}>
@@ -267,9 +272,22 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: "rgba(44,24,16,0.45)",
   },
+  backButton: {
+    position: "absolute",
+    top: spacing.sm,
+    left: spacing.md,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backButtonIcon: { color: "#fff", fontSize: 20, lineHeight: 22 },
+
   heroTextBlock: {
     position: "absolute",
-    top: spacing.lg,
+    top: spacing.sm + 40 + spacing.sm,
     left: spacing.lg,
     right: "40%",
     gap: 2,

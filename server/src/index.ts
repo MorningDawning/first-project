@@ -1,4 +1,5 @@
 import "dotenv/config";
+import path from "path";
 import cors from "cors";
 import express from "express";
 import { authRouter } from "./routes/auth";
@@ -16,6 +17,12 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// Реальные фото пива — те же, что собираются для датасета CLIP (см. /ml).
+// beer.imageUrl хранит относительный путь вида "/beer-photos/<slug>/<файл>",
+// мобильное приложение достраивает его до полного адреса само (см.
+// mobile/src/api/config.ts resolveMediaUrl) — так же, как уже делает для API_URL.
+app.use("/beer-photos", express.static(path.join(__dirname, "..", "..", "ml", "dataset")));
 
 app.use("/auth", authRouter);
 app.use("/", usersRouter);

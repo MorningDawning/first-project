@@ -63,6 +63,7 @@ export function LibraryScreen() {
           showsHorizontalScrollIndicator={false}
           data={["Все", ...styles_]}
           keyExtractor={(s) => s}
+          style={styles.filtersList}
           contentContainerStyle={styles.filters}
           renderItem={({ item }) => {
             const isActive = item === "Все" ? activeStyle === null : activeStyle === item;
@@ -118,7 +119,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
-  filters: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  filtersList: { flexGrow: 0, height: 48, marginBottom: spacing.sm },
+  filters: { paddingHorizontal: spacing.lg, alignItems: "center" },
   filterChip: {
     borderWidth: 1,
     borderColor: colors.border,
