@@ -31,7 +31,6 @@ export const beersApi = {
   search: (params: { q?: string; style?: string }) =>
     api.get<BeerSummary[]>("/beers", { params }).then((r) => r.data),
   styles: () => api.get<string[]>("/beers/styles").then((r) => r.data),
-  onboarding: () => api.get<BeerSummary[]>("/beers/onboarding").then((r) => r.data),
   detail: (id: string) => api.get<BeerDetail>(`/beers/${id}`).then((r) => r.data),
   review: (id: string, rating: number, text?: string) =>
     api.post(`/beers/${id}/reviews`, { rating, text }).then((r) => r.data),
@@ -63,6 +62,8 @@ export const breweriesApi = {
 
 export const tasteProfileApi = {
   get: () => api.get<TasteProfileResponse>("/taste-profile").then((r) => r.data),
+  submitQuiz: (answers: { bitterness: number; body: number; aroma: number }) =>
+    api.post<TasteProfileResponse>("/taste-profile/quiz", answers).then((r) => r.data),
 };
 
 export const feedApi = {

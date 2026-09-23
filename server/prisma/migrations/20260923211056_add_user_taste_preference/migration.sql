@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "prefAroma" INTEGER;
+ALTER TABLE "User" ADD COLUMN "prefBitterness" INTEGER;
+ALTER TABLE "User" ADD COLUMN "prefBody" INTEGER;
+ALTER TABLE "User" ADD COLUMN "prefSourness" INTEGER;
+ALTER TABLE "User" ADD COLUMN "prefSweetness" INTEGER;

@@ -6,6 +6,7 @@ import { MainTabNavigator } from "./MainTabNavigator";
 import { OnboardingScreen } from "../screens/onboarding/OnboardingScreen";
 import { LoadingView } from "../components/StateViews";
 import { colors } from "../theme/colors";
+import { MainTabParamList } from "./types";
 
 const navTheme = {
   ...DefaultTheme,
@@ -22,6 +23,7 @@ const navTheme = {
 export function RootNavigator() {
   const { isLoading, isAuthenticated, user } = useAuth();
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  const [initialTab, setInitialTab] = useState<keyof MainTabParamList>("HomeTab");
 
   if (isLoading) return <LoadingView label="Открываем BeerVia…" />;
 
@@ -34,14 +36,19 @@ export function RootNavigator() {
     user.stats.reviewCount === 0 &&
     !onboardingDismissed;
 
+  function finishOnboarding(openCamera: boolean) {
+    if (openCamera) setInitialTab("CameraTab");
+    setOnboardingDismissed(true);
+  }
+
   return (
     <NavigationContainer theme={navTheme}>
       {!isAuthenticated ? (
         <AuthNavigator />
       ) : needsOnboarding ? (
-        <OnboardingScreen onDone={() => setOnboardingDismissed(true)} />
+        <OnboardingScreen onDone={finishOnboarding} />
       ) : (
-        <MainTabNavigator />
+        <MainTabNavigator initialRouteName={initialTab} />
       )}
     </NavigationContainer>
   );

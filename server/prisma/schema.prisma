@@ -16,6 +16,14 @@ model User {
   bio          String?
   createdAt    DateTime @default(now())
 
+  // Вкусовые предпочтения из онбординг-квиза (0-100), заполняются до первого
+  // скана или отзыва — см. computeUserTasteProfile в lib/taste.ts.
+  prefSweetness Int?
+  prefBitterness Int?
+  prefSourness  Int?
+  prefBody      Int?
+  prefAroma     Int?
+
   reviews       Review[]
   scans         ScanHistory[]
   posts         FriendPost[]

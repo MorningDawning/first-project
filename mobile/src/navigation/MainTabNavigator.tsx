@@ -27,9 +27,12 @@ const LABELS: Record<RegularTabName, string> = {
   ProfileTab: "Профиль",
 };
 
-export function MainTabNavigator() {
+type Props = { initialRouteName?: keyof MainTabParamList };
+
+export function MainTabNavigator({ initialRouteName }: Props) {
   return (
     <Tab.Navigator
+      initialRouteName={initialRouteName}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,

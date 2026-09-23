@@ -28,9 +28,28 @@ export function matchPercent(a: TasteVector, b: TasteVector): number {
 }
 
 /**
+ * Reads the onboarding quiz's declared taste preference for a user, if they've
+ * gone through it. Axes the quiz didn't ask about default to a neutral 50.
+ */
+async function declaredPreference(userId: string): Promise<TasteVector | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
+  const { prefSweetness, prefBitterness, prefSourness, prefBody, prefAroma } = user;
+  if ([prefSweetness, prefBitterness, prefSourness, prefBody, prefAroma].every((v) => v == null)) return null;
+  return {
+    sweetness: prefSweetness ?? 50,
+    bitterness: prefBitterness ?? 50,
+    sourness: prefSourness ?? 50,
+    body: prefBody ?? 50,
+    aroma: prefAroma ?? 50,
+  };
+}
+
+/**
  * Aggregates a user's taste profile from their reviews (weighted by rating),
- * falling back to scan history (implicit neutral-positive weight) when they
- * haven't rated anything yet. Returns null if the user has no signal at all.
+ * falling back to scan history (implicit neutral-positive weight), then to
+ * the onboarding quiz's declared preference, when they haven't rated
+ * anything yet. Returns null if the user has no signal at all.
  */
 export async function computeUserTasteProfile(userId: string): Promise<TasteVector | null> {
   const reviews = await prisma.review.findMany({
@@ -52,7 +71,7 @@ export async function computeUserTasteProfile(userId: string): Promise<TasteVect
     weighted.push(...scans.map((s) => ({ vector: tasteVector(s.beer), weight: 3.5 })));
   }
 
-  if (weighted.length === 0) return null;
+  if (weighted.length === 0) return declaredPreference(userId);
 
   const totalWeight = weighted.reduce((sum, w) => sum + w.weight, 0);
   const profile = {} as TasteVector;
@@ -60,40 +79,6 @@ export async function computeUserTasteProfile(userId: string): Promise<TasteVect
     profile[axis] = Math.round(weighted.reduce((sum, w) => sum + w.vector[axis] * w.weight, 0) / totalWeight);
   }
   return profile;
-}
-
-function distance(a: TasteVector, b: TasteVector): number {
-  return AXES.reduce((sum, axis) => sum + Math.abs(a[axis] - b[axis]), 0);
-}
-
-/**
- * Greedy farthest-point sampling: picks `count` beers that spread as widely
- * as possible across the taste space, for the onboarding quiz — rating a
- * spiky IPA, a sour, a stout and a lager tells us a lot more about someone's
- * palate than rating four beers that all taste roughly the same.
- */
-export function pickDiverseBeers<T extends Beer>(beers: T[], count: number): T[] {
-  if (beers.length <= count) return beers;
-
-  const remaining = [...beers];
-  const picked: T[] = [remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0]];
-
-  while (picked.length < count && remaining.length > 0) {
-    let bestIndex = 0;
-    let bestMinDistance = -1;
-
-    remaining.forEach((candidate, index) => {
-      const minDistance = Math.min(...picked.map((p) => distance(tasteVector(candidate), tasteVector(p))));
-      if (minDistance > bestMinDistance) {
-        bestMinDistance = minDistance;
-        bestIndex = index;
-      }
-    });
-
-    picked.push(remaining.splice(bestIndex, 1)[0]);
-  }
-
-  return picked;
 }
 
 export async function findSimilarBeers(beer: Beer, limit = 4) {
