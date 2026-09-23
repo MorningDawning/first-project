@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
-import { computeUserTasteProfile, findSimilarBeers, matchPercent, tasteVector } from "../lib/taste";
+import { computeUserTasteProfile, findSimilarBeers, matchPercent, pickDiverseBeers, tasteVector } from "../lib/taste";
 import { serializeBeer, serializeBeerDetail } from "../lib/serialize";
 
 export const beersRouter = Router();
@@ -40,6 +40,14 @@ beersRouter.get("/", requireAuth, async (req, res) => {
 beersRouter.get("/styles", requireAuth, async (_req, res) => {
   const beers = await prisma.beer.findMany({ select: { style: true }, distinct: ["style"] });
   res.json(beers.map((b) => b.style).sort());
+});
+
+// GET /beers/onboarding — a handful of beers picked to span the taste space
+// as widely as possible, for the "rate a few to get started" taste quiz.
+beersRouter.get("/onboarding", requireAuth, async (_req, res) => {
+  const beers = await prisma.beer.findMany({ include: { brewery: true } });
+  const picks = pickDiverseBeers(beers, 6);
+  res.json(picks.map((b) => serializeBeer(b, null)));
 });
 
 beersRouter.get("/:id", requireAuth, async (req, res) => {

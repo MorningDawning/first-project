@@ -62,6 +62,40 @@ export async function computeUserTasteProfile(userId: string): Promise<TasteVect
   return profile;
 }
 
+function distance(a: TasteVector, b: TasteVector): number {
+  return AXES.reduce((sum, axis) => sum + Math.abs(a[axis] - b[axis]), 0);
+}
+
+/**
+ * Greedy farthest-point sampling: picks `count` beers that spread as widely
+ * as possible across the taste space, for the onboarding quiz — rating a
+ * spiky IPA, a sour, a stout and a lager tells us a lot more about someone's
+ * palate than rating four beers that all taste roughly the same.
+ */
+export function pickDiverseBeers<T extends Beer>(beers: T[], count: number): T[] {
+  if (beers.length <= count) return beers;
+
+  const remaining = [...beers];
+  const picked: T[] = [remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0]];
+
+  while (picked.length < count && remaining.length > 0) {
+    let bestIndex = 0;
+    let bestMinDistance = -1;
+
+    remaining.forEach((candidate, index) => {
+      const minDistance = Math.min(...picked.map((p) => distance(tasteVector(candidate), tasteVector(p))));
+      if (minDistance > bestMinDistance) {
+        bestMinDistance = minDistance;
+        bestIndex = index;
+      }
+    });
+
+    picked.push(remaining.splice(bestIndex, 1)[0]);
+  }
+
+  return picked;
+}
+
 export async function findSimilarBeers(beer: Beer, limit = 4) {
   const candidates = await prisma.beer.findMany({
     where: { id: { not: beer.id } },

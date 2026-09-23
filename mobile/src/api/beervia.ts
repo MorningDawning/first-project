@@ -31,6 +31,7 @@ export const beersApi = {
   search: (params: { q?: string; style?: string }) =>
     api.get<BeerSummary[]>("/beers", { params }).then((r) => r.data),
   styles: () => api.get<string[]>("/beers/styles").then((r) => r.data),
+  onboarding: () => api.get<BeerSummary[]>("/beers/onboarding").then((r) => r.data),
   detail: (id: string) => api.get<BeerDetail>(`/beers/${id}`).then((r) => r.data),
   review: (id: string, rating: number, text?: string) =>
     api.post(`/beers/${id}/reviews`, { rating, text }).then((r) => r.data),

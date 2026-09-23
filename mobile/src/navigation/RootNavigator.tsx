@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { AuthNavigator } from "./AuthNavigator";
 import { MainTabNavigator } from "./MainTabNavigator";
+import { OnboardingScreen } from "../screens/onboarding/OnboardingScreen";
 import { LoadingView } from "../components/StateViews";
 import { colors } from "../theme/colors";
 
@@ -19,13 +20,29 @@ const navTheme = {
 };
 
 export function RootNavigator() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   if (isLoading) return <LoadingView label="Открываем BeerVia…" />;
 
+  // Новый аккаунт без единого отзыва/скана — короткий вкусовой опрос вместо
+  // пустого приложения. Пропускается на текущую сессию, как только закрыт.
+  const needsOnboarding =
+    isAuthenticated &&
+    user != null &&
+    user.stats.scanCount === 0 &&
+    user.stats.reviewCount === 0 &&
+    !onboardingDismissed;
+
   return (
     <NavigationContainer theme={navTheme}>
-      {isAuthenticated ? <MainTabNavigator /> : <AuthNavigator />}
+      {!isAuthenticated ? (
+        <AuthNavigator />
+      ) : needsOnboarding ? (
+        <OnboardingScreen onDone={() => setOnboardingDismissed(true)} />
+      ) : (
+        <MainTabNavigator />
+      )}
     </NavigationContainer>
   );
 }
