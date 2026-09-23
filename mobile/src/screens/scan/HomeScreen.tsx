@@ -3,15 +3,14 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
-import { Button } from "../../components/Button";
 import { BeerCard } from "../../components/BeerCard";
 import { useAuth } from "../../context/AuthContext";
 import { beersApi } from "../../api/beervia";
 import { spacing, typography } from "../../theme/colors";
-import { ScanStackParamList } from "../../navigation/types";
+import { HomeStackParamList } from "../../navigation/types";
 import { BeerSummary } from "../../types";
 
-type Nav = NativeStackNavigationProp<ScanStackParamList, "Home">;
+type Nav = NativeStackNavigationProp<HomeStackParamList, "Home">;
 
 export function HomeScreen() {
   const navigation = useNavigation<Nav>();
@@ -39,12 +38,6 @@ export function HomeScreen() {
         <Text style={styles.greeting}>{firstName ? `Привет, ${firstName}!` : "BeerVia"}</Text>
         <Text style={styles.subtitle}>Что сегодня пьём?</Text>
 
-        <Button
-          title="📷  Сканировать пиво"
-          onPress={() => navigation.navigate("Camera")}
-          style={styles.scanButton}
-        />
-
         {recommendations.length > 0 && (
           <View style={styles.recs}>
             <Text style={styles.sectionTitle}>Рекомендуем по вашему вкусу</Text>
@@ -70,7 +63,6 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
   greeting: { ...typography.title },
   subtitle: { ...typography.caption, marginTop: 2, marginBottom: spacing.lg },
-  scanButton: { marginBottom: spacing.xl },
   recs: {},
   sectionTitle: { ...typography.heading, marginBottom: spacing.sm },
 });

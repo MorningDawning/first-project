@@ -3,18 +3,19 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
+import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { Button } from "../../components/Button";
 import { scanApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { colors, radius, spacing } from "../../theme/colors";
-import { ScanStackParamList } from "../../navigation/types";
+import { MainTabParamList } from "../../navigation/types";
 
-type Nav = NativeStackNavigationProp<ScanStackParamList, "Camera">;
+type Nav = BottomTabNavigationProp<MainTabParamList, "CameraTab">;
 
 export function CameraScanScreen() {
   const navigation = useNavigation<Nav>();
+  const isFocused = useIsFocused();
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [torch, setTorch] = useState(false);
@@ -23,15 +24,21 @@ export function CameraScanScreen() {
   // Останавливаем рендер CameraView сразу после съёмки/выбора фото, не дожидаясь
   // навигации — иначе нативная камера-сессия иногда остаётся «висеть» в фоне
   // (iOS показывает системную плашку «вернуться к камере» поверх других экранов).
+  // Также следим за фокусом вкладки: камера теперь отдельная вкладка таббара и
+  // остаётся смонтированной при переходе на другие вкладки, так что без этого
+  // объектив продолжал бы работать в фоне.
   const [cameraActive, setCameraActive] = useState(true);
+  const cameraVisible = cameraActive && isFocused;
 
   async function submitPhoto(uri: string) {
     setError(null);
     setScanning(true);
     try {
       const beer = await scanApi.scan(uri);
-      // Заменяем экран камеры карточкой пива, чтобы «Назад» вело на Главную, а не обратно на камеру.
-      navigation.replace("BeerDetail", { beerId: beer.id });
+      // Результат показываем во вкладке «Главная», а не поверх камеры — так вкладка
+      // «Скан» остаётся отдельным инструментом, а «Назад» с карточки ведёт на Главную.
+      navigation.navigate("HomeTab", { screen: "BeerDetail", params: { beerId: beer.id } });
+      setCameraActive(true);
     } catch (e) {
       setError(apiErrorMessage(e, "Не удалось распознать пиво"));
       setCameraActive(true);
@@ -66,13 +73,13 @@ export function CameraScanScreen() {
 
   return (
     <View style={styles.root}>
-      {permission?.granted && cameraActive && (
+      {permission?.granted && cameraVisible && (
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} />
       )}
 
       <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
         <View style={styles.topBar}>
-          <RoundIconButton icon="✕" onPress={() => navigation.goBack()} />
+          <RoundIconButton icon="✕" onPress={() => navigation.navigate("HomeTab", { screen: "Home" })} />
           {permission?.granted && (
             <RoundIconButton icon={torch ? "⚡️" : "⚡"} active={torch} onPress={() => setTorch((t) => !t)} />
           )}

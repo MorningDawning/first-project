@@ -5,9 +5,8 @@ export type AuthStackParamList = {
   Register: undefined;
 };
 
-export type ScanStackParamList = {
+export type HomeStackParamList = {
   Home: undefined;
-  Camera: undefined;
   BeerDetail: { beerId: string };
 };
 
@@ -32,10 +31,11 @@ export type ProfileStackParamList = {
 };
 
 export type MainTabParamList = {
-  ScanTab: NavigatorScreenParams<ScanStackParamList>;
+  HomeTab: NavigatorScreenParams<HomeStackParamList>;
   LibraryTab: NavigatorScreenParams<LibraryStackParamList>;
   BarTab: NavigatorScreenParams<BarStackParamList>;
   ProfileTab: NavigatorScreenParams<ProfileStackParamList>;
+  CameraTab: undefined;
 };
 
 export type RootStackParamList = {
