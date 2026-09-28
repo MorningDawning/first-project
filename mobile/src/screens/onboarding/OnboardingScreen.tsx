@@ -5,7 +5,7 @@ import { Button } from "../../components/Button";
 import { BeerArt } from "../../components/BeerArt";
 import { MatchBadge } from "../../components/MatchBadge";
 import { tasteProfileApi } from "../../api/beervia";
-import { colors, radius, spacing, typography } from "../../theme/colors";
+import { colors, fonts, radius, spacing, typography } from "../../theme/colors";
 import { QuizResult } from "../../types";
 
 type Props = { onDone: (openCamera: boolean) => void };
@@ -184,6 +184,18 @@ const QUESTIONS: Question[] = [
   },
 ];
 
+const AXIS_LABEL: Record<Axis, string> = {
+  bitterness: "Горечь",
+  body: "Плотность",
+  aroma: "Аромат хмеля",
+  sweetness: "Сладость",
+  sourness: "Кислотность",
+};
+
+function isAxis(field: Field): field is Axis {
+  return field in AXIS_LABEL;
+}
+
 const SCALE_ROWS: { axis: Axis; icon: string; label: string; low: string; high: string }[] = [
   { axis: "sweetness", icon: "🍬", label: "Сладость", low: "Сухое", high: "Сладкое" },
   { axis: "bitterness", icon: "🌿", label: "Горечь", low: "Мягкая", high: "Выраженная" },
@@ -290,6 +302,17 @@ export function OnboardingScreen({ onDone }: Props) {
     });
   }
 
+  function goBack() {
+    if (questionIndex === 0) return;
+    const prevIndex = questionIndex - 1;
+    transitionTo(() => {
+      setQuestionIndex(prevIndex);
+      // Возвращает уже выбранный ответ на предыдущий вопрос, если он был —
+      // так «Назад» показывает то же состояние, а не пустой вопрос заново.
+      setSelectedValue(answers[QUESTIONS[prevIndex].field] ?? null);
+    });
+  }
+
   const animatedStyle = {
     opacity: anim,
     transform: [
@@ -305,6 +328,13 @@ export function OnboardingScreen({ onDone }: Props) {
       {step === "quiz" && (
         <ScrollView contentContainerStyle={styles.quizScroll}>
           <View style={styles.topRow}>
+            {questionIndex > 0 ? (
+              <Pressable onPress={goBack} style={styles.backBtn} hitSlop={8}>
+                <Text style={styles.backBtnIcon}>←</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.backBtn} />
+            )}
             <View style={styles.progressWrap}>
               <Text style={styles.progressLabel}>
                 Вопрос {questionIndex + 1} из {QUESTIONS.length}
@@ -360,6 +390,17 @@ export function OnboardingScreen({ onDone }: Props) {
                 <Text style={styles.rationaleText}>
                   {question.options.find((o) => o.value === selectedValue)?.rationale}
                 </Text>
+                {isAxis(question.field) && typeof selectedValue === "number" && (
+                  <View style={styles.deltaRow}>
+                    <Text style={styles.deltaLabel}>{AXIS_LABEL[question.field]}</Text>
+                    <View style={styles.deltaTrack}>
+                      <View style={[styles.deltaFill, { width: `${selectedValue}%` }]} />
+                    </View>
+                    <View style={styles.deltaBadge}>
+                      <Text style={styles.deltaBadgeText}>{selectedValue > 50 ? "+" : "−"}{Math.abs(selectedValue - 50)}</Text>
+                    </View>
+                  </View>
+                )}
                 <Button title="Далее →" onPress={goNext} style={styles.rationaleButton} />
               </Animated.View>
             )}
@@ -471,15 +512,24 @@ const styles = StyleSheet.create({
   content: { flex: 1, padding: spacing.lg },
   quizScroll: { flexGrow: 1, padding: spacing.lg },
 
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  progressWrap: { flex: 1, marginRight: spacing.md, gap: spacing.xs },
-  progressLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
+  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backBtnIcon: { fontSize: 18, color: colors.text },
+  progressWrap: { flex: 1, gap: spacing.xs },
+  progressLabel: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.textMuted },
   progressTrack: { height: 4, borderRadius: 2, backgroundColor: colors.border },
   progressFill: { height: 4, borderRadius: 2, backgroundColor: colors.primary },
-  skip: { ...typography.caption, textDecorationLine: "underline" },
+  skip: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.textMuted, textDecorationLine: "underline" },
 
   quizBody: { flex: 1, justifyContent: "center", gap: spacing.lg },
-  questionLabel: { fontSize: 22, fontWeight: "800", color: colors.primary, textAlign: "center" },
+  questionLabel: { fontFamily: fonts.display, fontSize: 24, color: colors.primary, textAlign: "center" },
   optionsCol: { gap: spacing.md },
   optionCard: {
     backgroundColor: colors.card,
@@ -498,38 +548,43 @@ const styles = StyleSheet.create({
   optionCardPressed: { borderColor: colors.border, backgroundColor: colors.background },
   optionIconBadge: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center" },
   optionIcon: { fontSize: 36 },
-  optionTitle: { fontSize: 18, fontWeight: "700", color: colors.text },
+  optionTitle: { fontFamily: fonts.bodyBold, fontSize: 18, color: colors.text },
 
   rationaleCard: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
+    backgroundColor: "#E1EECC",
+    borderRadius: radius.lg,
+    padding: spacing.md + 2,
     gap: spacing.sm,
   },
   rationaleLabel: {
+    fontFamily: fonts.bodyBold,
     fontSize: 11,
-    fontWeight: "700",
-    color: colors.accent,
+    color: colors.success,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  rationaleText: { fontSize: 14, color: colors.text, lineHeight: 20 },
+  rationaleText: { fontFamily: fonts.body, fontSize: 14, color: "#272E1B", lineHeight: 20 },
   rationaleButton: { marginTop: spacing.xs },
+
+  deltaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  deltaLabel: { fontFamily: fonts.bodyMedium, fontSize: 13, color: "#272E1B", width: 100 },
+  deltaTrack: { flex: 1, height: 8, borderRadius: 9, backgroundColor: "#CCDBB2" },
+  deltaFill: { height: "100%", borderRadius: 9, backgroundColor: colors.success },
+  deltaBadge: { backgroundColor: colors.success, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  deltaBadgeText: { fontFamily: fonts.bodyBold, fontSize: 12, color: "#F0FAE1" },
 
   resultScroll: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
   resultLoading: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.xl * 2, gap: spacing.md },
-  resultLoadingText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
-  resultCategory: { ...typography.caption, fontWeight: "700", color: colors.accent, textAlign: "center" },
-  resultTitle: { ...typography.title, textAlign: "center", marginTop: spacing.xs },
-  resultTagline: { ...typography.caption, textAlign: "center", marginTop: spacing.xs },
+  resultLoadingText: { fontFamily: fonts.body, fontSize: 15, color: colors.textMuted, textAlign: "center" },
+  resultCategory: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.accent, textAlign: "center" },
+  resultTitle: { fontFamily: fonts.display, fontSize: 28, color: colors.text, textAlign: "center", marginTop: spacing.xs },
+  resultTagline: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, textAlign: "center", marginTop: spacing.xs },
 
   scaleList: { gap: spacing.lg, marginTop: spacing.xl },
   scaleRow: { gap: spacing.xs },
   scaleHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   scaleIcon: { fontSize: 16 },
-  scaleLabel: { fontSize: 14, fontWeight: "700", color: colors.text },
+  scaleLabel: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.text },
   scaleTrack: { height: 6, borderRadius: 3, backgroundColor: colors.border, marginTop: spacing.xs },
   scaleDot: {
     position: "absolute",
@@ -548,23 +603,21 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   scaleEnds: { flexDirection: "row", justifyContent: "space-between" },
-  scaleEndText: { fontSize: 11, color: colors.textMuted },
+  scaleEndText: { fontFamily: fonts.body, fontSize: 11, color: colors.textMuted },
 
   recWrap: { marginTop: spacing.xl, gap: spacing.sm },
-  recLabel: { fontSize: 13, fontWeight: "700", color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
+  recLabel: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
   recCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.sm,
   },
   recInfo: { flex: 1, gap: 4 },
-  recName: { fontSize: 15, fontWeight: "700", color: colors.text },
-  recMeta: { fontSize: 13, color: colors.textMuted },
+  recName: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.text },
+  recMeta: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
 
   resultButton: { marginTop: spacing.xl },
 
