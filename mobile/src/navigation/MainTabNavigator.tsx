@@ -3,11 +3,11 @@ import { StyleSheet, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MainTabParamList } from "./types";
 import { HomeNavigator } from "./HomeNavigator";
-import { LibraryNavigator } from "./LibraryNavigator";
+import { FeedNavigator } from "./FeedNavigator";
 import { BarNavigator } from "./BarNavigator";
 import { ProfileNavigator } from "./ProfileNavigator";
 import { CameraScanScreen } from "../screens/scan/CameraScanScreen";
-import { BarIcon, CameraIcon, HomeIcon, IconProps, LibraryIcon, ProfileIcon } from "../components/icons/TabIcons";
+import { BarIcon, CameraIcon, FeedIcon, HomeIcon, IconProps, ProfileIcon } from "../components/icons/TabIcons";
 import { colors, fonts } from "../theme/colors";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -16,14 +16,14 @@ type RegularTabName = Exclude<keyof MainTabParamList, "CameraTab">;
 
 const ICONS: Record<RegularTabName, (props: IconProps) => React.JSX.Element> = {
   HomeTab: HomeIcon,
-  LibraryTab: LibraryIcon,
+  FeedTab: FeedIcon,
   BarTab: BarIcon,
   ProfileTab: ProfileIcon,
 };
 
 const LABELS: Record<RegularTabName, string> = {
   HomeTab: "Главная",
-  LibraryTab: "Библиотека",
+  FeedTab: "Лента",
   BarTab: "Бар",
   ProfileTab: "Профиль",
 };
@@ -48,7 +48,7 @@ export function MainTabNavigator({ initialRouteName }: Props) {
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeNavigator} />
-      <Tab.Screen name="LibraryTab" component={LibraryNavigator} />
+      <Tab.Screen name="FeedTab" component={FeedNavigator} />
       <Tab.Screen
         name="CameraTab"
         component={CameraScanScreen}

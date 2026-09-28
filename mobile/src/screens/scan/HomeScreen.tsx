@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
@@ -21,6 +21,11 @@ export function HomeScreen() {
   const [forYou, setForYou] = useState<BeerSummary[]>([]);
   const [recent, setRecent] = useState<BarEntry[]>([]);
   const [matchById, setMatchById] = useState<Map<string, number | null>>(new Map());
+  const [styleChips, setStyleChips] = useState<string[]>([]);
+
+  useEffect(() => {
+    beersApi.styles().then((list) => setStyleChips(list.slice(0, 8))).catch(() => {});
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,10 +71,31 @@ export function HomeScreen() {
           </View>
         </Pressable>
 
+        <Pressable
+          onPress={() => navigation.navigate("Catalog", { focusSearch: true })}
+          style={({ pressed }) => [styles.search, pressed && styles.searchPressed]}
+        >
+          <Text style={styles.searchIcon}>⚲</Text>
+          <Text style={styles.searchText}>Найти пиво…</Text>
+        </Pressable>
+
+        {styleChips.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow} contentContainerStyle={styles.chips}>
+            {styleChips.map((s) => (
+              <Pressable key={s} onPress={() => navigation.navigate("Catalog", { style: s })} style={styles.chip}>
+                <Text style={styles.chipText}>{s}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+
         {forYou.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Для тебя</Text>
+              <Pressable onPress={() => navigation.navigate("Catalog")} hitSlop={8}>
+                <Text style={styles.sectionLink}>Все ›</Text>
+              </Pressable>
             </View>
             <FlatList
               data={forYou}
@@ -150,9 +176,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  section: { marginTop: spacing.xl },
+  search: {
+    marginTop: spacing.sm + 4,
+    height: 50,
+    borderRadius: radius.pill,
+    backgroundColor: colors.card,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm + 2,
+    paddingHorizontal: 18,
+  },
+  searchPressed: { opacity: 0.85 },
+  searchIcon: { fontSize: 16, color: colors.textMuted },
+  searchText: { fontFamily: fonts.body, fontSize: 15, color: colors.textMuted },
+  chipsRow: { flexGrow: 0, marginTop: 10 },
+  chips: { gap: spacing.sm },
+  chip: { backgroundColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 9 },
+  chipText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.text },
+
+  section: { marginTop: spacing.lg + 4 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   sectionTitle: { fontFamily: fonts.display, fontSize: 21, color: colors.text, marginBottom: spacing.sm },
+  sectionLink: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: "#8C491A" },
   forYouRow: { marginTop: spacing.xs },
   forYouList: { gap: spacing.sm },
 });

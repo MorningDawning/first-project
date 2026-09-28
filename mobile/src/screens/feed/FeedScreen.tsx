@@ -14,7 +14,7 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 }
 
-export function FriendsFeedScreen() {
+export function FeedScreen() {
   const [posts, setPosts] = useState<FriendPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,7 +60,7 @@ export function FriendsFeedScreen() {
 
   const header = (
     <View style={styles.composer}>
-      <Text style={styles.title}>Лента друзей</Text>
+      <Text style={styles.title}>Лента</Text>
       <TextField label="Поделитесь находкой" value={text} onChangeText={setText} multiline placeholder="Что попробовали сегодня?" />
       <TextField label="Ссылка на фото (необязательно)" value={imageUrl} onChangeText={setImageUrl} placeholder="https://…" autoCapitalize="none" />
       <Button title="Опубликовать" onPress={handlePost} loading={posting} disabled={!text.trim()} />

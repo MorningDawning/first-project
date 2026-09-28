@@ -7,11 +7,12 @@ export type AuthStackParamList = {
 
 export type HomeStackParamList = {
   Home: undefined;
+  Catalog: { style?: string; focusSearch?: boolean } | undefined;
   BeerDetail: { beerId: string };
 };
 
-export type LibraryStackParamList = {
-  LibraryHome: undefined;
+export type FeedStackParamList = {
+  FeedHome: undefined;
   BeerDetail: { beerId: string };
 };
 
@@ -26,13 +27,12 @@ export type ProfileStackParamList = {
   Breweries: undefined;
   BreweryDetail: { breweryId: string };
   Settings: undefined;
-  FriendsFeed: undefined;
   BeerDetail: { beerId: string };
 };
 
 export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList>;
-  LibraryTab: NavigatorScreenParams<LibraryStackParamList>;
+  FeedTab: NavigatorScreenParams<FeedStackParamList>;
   BarTab: NavigatorScreenParams<BarStackParamList>;
   ProfileTab: NavigatorScreenParams<ProfileStackParamList>;
   CameraTab: undefined;

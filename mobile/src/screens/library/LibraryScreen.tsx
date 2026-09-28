@@ -1,23 +1,24 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { BeerCard } from "../../components/BeerCard";
 import { EmptyView, ErrorView, LoadingView } from "../../components/StateViews";
 import { beersApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
-import { LibraryStackParamList } from "../../navigation/types";
+import { HomeStackParamList } from "../../navigation/types";
 import { BeerSummary } from "../../types";
 
-type Nav = NativeStackNavigationProp<LibraryStackParamList, "LibraryHome">;
+type Nav = NativeStackNavigationProp<HomeStackParamList, "Catalog">;
 
 export function LibraryScreen() {
   const navigation = useNavigation<Nav>();
+  const route = useRoute<RouteProp<HomeStackParamList, "Catalog">>();
   const [query, setQuery] = useState("");
   const [styles_, setStyles] = useState<string[]>([]);
-  const [activeStyle, setActiveStyle] = useState<string | null>(null);
+  const [activeStyle, setActiveStyle] = useState<string | null>(route.params?.style ?? null);
   const [beers, setBeers] = useState<BeerSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,12 @@ export function LibraryScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={styles.title}>Библиотека</Text>
+        <View style={styles.titleRow}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={8}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+          <Text style={styles.title}>Библиотека</Text>
+        </View>
         <View style={styles.searchWrap}>
           <Text style={styles.searchIcon}>⚲</Text>
           <TextInput
@@ -58,6 +64,7 @@ export function LibraryScreen() {
             onChangeText={setQuery}
             placeholder="Название, пивоварня, стиль"
             placeholderTextColor={colors.textMuted}
+            autoFocus={route.params?.focusSearch}
             style={styles.search}
           />
         </View>
@@ -129,7 +136,17 @@ function pluralBeers(n: number): string {
 
 const styles = StyleSheet.create({
   header: { padding: spacing.lg, paddingBottom: spacing.sm },
-  title: { fontFamily: fonts.display, fontSize: 26, color: colors.text, marginBottom: spacing.md },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: spacing.md },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backIcon: { fontSize: 20, color: colors.text },
+  title: { fontFamily: fonts.display, fontSize: 30, color: colors.text },
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",

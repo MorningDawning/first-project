@@ -15,8 +15,8 @@ export function HomeIcon(props: IconProps) {
   return <StrokeIcon {...props} d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />;
 }
 
-export function LibraryIcon(props: IconProps) {
-  return <StrokeIcon {...props} d="M10 2h4v3l2 3v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8l2-3zM8 12h8" />;
+export function FeedIcon(props: IconProps) {
+  return <StrokeIcon {...props} d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z" />;
 }
 
 export function BarIcon(props: IconProps) {

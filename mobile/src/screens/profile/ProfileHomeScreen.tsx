@@ -13,7 +13,6 @@ type Nav = NativeStackNavigationProp<ProfileStackParamList, "ProfileHome">;
 
 const MENU: { key: keyof ProfileStackParamList; label: string; emoji: string; description: string }[] = [
   { key: "Breweries", label: "Пивоварни мира", emoji: "🌍", description: "Библиотека пивоварен со всего света" },
-  { key: "FriendsFeed", label: "Лента друзей", emoji: "📸", description: "Посты и находки других пользователей" },
   { key: "Settings", label: "Настройки", emoji: "⚙️", description: "Профиль, аккаунт, выход" },
 ];
 
