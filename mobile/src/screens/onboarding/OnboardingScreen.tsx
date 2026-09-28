@@ -196,12 +196,28 @@ function isAxis(field: Field): field is Axis {
   return field in AXIS_LABEL;
 }
 
-const SCALE_ROWS: { axis: Axis; icon: string; label: string; low: string; high: string }[] = [
-  { axis: "sweetness", icon: "🍬", label: "Сладость", low: "Сухое", high: "Сладкое" },
-  { axis: "bitterness", icon: "🌿", label: "Горечь", low: "Мягкая", high: "Выраженная" },
-  { axis: "sourness", icon: "🍏", label: "Кислотность", low: "Гладкая", high: "С кислинкой" },
-  { axis: "aroma", icon: "✨", label: "Аромат хмеля", low: "Сдержанный", high: "Яркий" },
-  { axis: "body", icon: "🍺", label: "Плотность", low: "Лёгкое", high: "Плотное" },
+const TAG_WORDS: Record<Axis, { low: string; high: string }> = {
+  sweetness: { low: "Сухое", high: "Сладкое" },
+  bitterness: { low: "Мягкая горечь", high: "Яркая горечь" },
+  sourness: { low: "Без кислинки", high: "С кислинкой" },
+  aroma: { low: "Сдержанный аромат", high: "Яркий хмель" },
+  body: { low: "Лёгкое тело", high: "Плотное тело" },
+};
+
+function personaTags(profile: Record<Axis, number>): string[] {
+  return (Object.keys(TAG_WORDS) as Axis[])
+    .map((axis) => ({ axis, dist: Math.abs(profile[axis] - 50) }))
+    .sort((a, b) => b.dist - a.dist)
+    .slice(0, 3)
+    .map(({ axis }) => (profile[axis] >= 50 ? TAG_WORDS[axis].high : TAG_WORDS[axis].low));
+}
+
+const SCALE_ROWS: { axis: Axis; label: string; low: string; high: string }[] = [
+  { axis: "sweetness", label: "Сладость", low: "Сухое", high: "Сладкое" },
+  { axis: "bitterness", label: "Горечь", low: "Мягкая", high: "Выраженная" },
+  { axis: "sourness", label: "Кислотность", low: "Гладкая", high: "С кислинкой" },
+  { axis: "aroma", label: "Аромат хмеля", low: "Сдержанный", high: "Яркий" },
+  { axis: "body", label: "Плотность", low: "Лёгкое", high: "Плотное" },
 ];
 
 export function OnboardingScreen({ onDone }: Props) {
@@ -350,7 +366,7 @@ export function OnboardingScreen({ onDone }: Props) {
             </Text>
 
             <View style={styles.welcomeActions}>
-              <Button title="Начать · 1 минута" onPress={() => transitionTo(() => setStep("quiz"))} />
+              <Button title="Начать" onPress={() => transitionTo(() => setStep("quiz"))} />
               <Pressable onPress={() => onDone(false)} hitSlop={8}>
                 <Text style={styles.welcomeSkip}>Пропустить</Text>
               </Pressable>
@@ -465,17 +481,20 @@ export function OnboardingScreen({ onDone }: Props) {
 
             {result && (
               <>
-                <Text style={styles.resultCategory}>{result.persona.category}</Text>
-                <Text style={styles.resultTitle}>🎉 {result.persona.title}</Text>
-                <Text style={styles.resultTagline}>{result.persona.tagline}</Text>
+                <Text style={styles.resultEyebrow}>Твой вкусовой профиль</Text>
+                <Text style={styles.resultTitle}>{result.persona.title}</Text>
+                <View style={styles.tagRow}>
+                  {personaTags(result.profile).map((tag) => (
+                    <View key={tag} style={styles.tagPill}>
+                      <Text style={styles.tagPillText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
 
                 <View style={styles.scaleList}>
                   {SCALE_ROWS.map((row, i) => (
                     <View key={row.axis} style={styles.scaleRow}>
-                      <View style={styles.scaleHeader}>
-                        <Text style={styles.scaleIcon}>{row.icon}</Text>
-                        <Text style={styles.scaleLabel}>{row.label}</Text>
-                      </View>
+                      <Text style={styles.scaleLabel}>{row.label}</Text>
                       <View style={styles.scaleTrack}>
                         <Animated.View
                           style={[
@@ -513,7 +532,7 @@ export function OnboardingScreen({ onDone }: Props) {
                 )}
 
                 <Button
-                  title="Далее →"
+                  title="Продолжить"
                   onPress={() => transitionTo(() => setStep("bridge"))}
                   style={styles.resultButton}
                 />
@@ -526,13 +545,33 @@ export function OnboardingScreen({ onDone }: Props) {
       {step === "bridge" && (
         <View style={styles.content}>
           <Animated.View style={[styles.bridgeBody, animatedStyle]}>
-            <Animated.View style={[styles.bridgeIconBadge, { transform: [{ scale: pulse }] }]}>
-              <Text style={styles.bridgeIcon}>🎯</Text>
-            </Animated.View>
-            <Text style={styles.bridgeText}>
-              Теперь наведи камеру на любое пиво — покажем, насколько зайдёт именно тебе
+            <View style={styles.bridgeArt}>
+              <View style={styles.bridgeCircle} />
+              <Animated.View style={[styles.bridgeFrame, { transform: [{ scale: pulse }] }]}>
+                <View style={[styles.bridgeCorner, styles.cornerTL]} />
+                <View style={[styles.bridgeCorner, styles.cornerTR]} />
+                <View style={[styles.bridgeCorner, styles.cornerBL]} />
+                <View style={[styles.bridgeCorner, styles.cornerBR]} />
+                <View style={styles.bridgeCan}>
+                  <View style={styles.bridgeCanFoam} />
+                </View>
+              </Animated.View>
+              <View style={styles.bridgeBadge}>
+                <Text style={styles.bridgeBadgeText}>92%</Text>
+              </View>
+            </View>
+
+            <Text style={styles.bridgeTitle}>Теперь наведи камеру на любое пиво</Text>
+            <Text style={styles.bridgeSubtitle}>
+              Этикетка, банка или меню в баре — покажем, насколько зайдёт именно тебе.
             </Text>
-            <Button title="📷  Сканировать" onPress={() => onDone(true)} style={styles.bridgeButton} />
+
+            <View style={styles.bridgeActions}>
+              <Button title="📷  Открыть камеру" onPress={() => onDone(true)} />
+              <Pressable onPress={() => onDone(false)} hitSlop={8}>
+                <Text style={styles.welcomeSkip}>Сначала посмотрю каталог</Text>
+              </Pressable>
+            </View>
           </Animated.View>
         </View>
       )}
@@ -653,19 +692,19 @@ const styles = StyleSheet.create({
   resultScroll: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
   resultLoading: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.xl * 2, gap: spacing.md },
   resultLoadingText: { fontFamily: fonts.body, fontSize: 15, color: colors.textMuted, textAlign: "center" },
-  resultCategory: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.accent, textAlign: "center" },
-  resultTitle: { fontFamily: fonts.display, fontSize: 28, color: colors.text, textAlign: "center", marginTop: spacing.xs },
-  resultTagline: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, textAlign: "center", marginTop: spacing.xs },
+  resultEyebrow: { fontFamily: fonts.bodyBold, fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: "#8C491A" },
+  resultTitle: { fontFamily: fonts.display, fontSize: 34, lineHeight: 38, color: colors.text, marginTop: spacing.sm },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: spacing.sm },
+  tagPill: { backgroundColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  tagPillText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.text },
 
-  scaleList: { gap: spacing.lg, marginTop: spacing.xl },
-  scaleRow: { gap: spacing.xs },
-  scaleHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  scaleIcon: { fontSize: 16 },
-  scaleLabel: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.text },
-  scaleTrack: { height: 6, borderRadius: 3, backgroundColor: colors.border, marginTop: spacing.xs },
+  scaleList: { gap: spacing.md, marginTop: spacing.lg, backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.md + 4 },
+  scaleRow: { gap: 7 },
+  scaleLabel: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.text },
+  scaleTrack: { height: 8, borderRadius: 4, backgroundColor: colors.border, marginTop: 2 },
   scaleDot: {
     position: "absolute",
-    top: -6,
+    top: -5,
     width: DOT_SIZE,
     height: DOT_SIZE,
     borderRadius: DOT_SIZE / 2,
@@ -680,17 +719,17 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   scaleEnds: { flexDirection: "row", justifyContent: "space-between" },
-  scaleEndText: { fontFamily: fonts.body, fontSize: 11, color: colors.textMuted },
+  scaleEndText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textMuted },
 
-  recWrap: { marginTop: spacing.xl, gap: spacing.sm },
-  recLabel: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
+  recWrap: { marginTop: spacing.lg, gap: spacing.sm },
+  recLabel: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1 },
   recCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.sm + 6,
     backgroundColor: colors.card,
-    borderRadius: radius.md,
-    padding: spacing.sm,
+    borderRadius: radius.lg - 4,
+    padding: spacing.sm + 4,
   },
   recInfo: { flex: 1, gap: 4 },
   recName: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.text },
@@ -698,16 +737,33 @@ const styles = StyleSheet.create({
 
   resultButton: { marginTop: spacing.xl },
 
-  bridgeBody: { flex: 1, justifyContent: "center", alignItems: "center", gap: spacing.lg },
-  bridgeIconBadge: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: TINTS.primary.badge,
-    alignItems: "center",
-    justifyContent: "center",
+  bridgeBody: { flex: 1, justifyContent: "center", gap: spacing.md },
+  bridgeArt: { height: 260, alignItems: "center", justifyContent: "center", marginBottom: spacing.sm },
+  bridgeCircle: { position: "absolute", width: 230, height: 230, borderRadius: 115, backgroundColor: "#FBDFD3" },
+  bridgeFrame: { width: 150, height: 180 },
+  bridgeCorner: { position: "absolute", width: 30, height: 30, borderColor: colors.primary },
+  cornerTL: { left: 0, top: 0, borderLeftWidth: 5, borderTopWidth: 5, borderTopLeftRadius: 18 },
+  cornerTR: { right: 0, top: 0, borderRightWidth: 5, borderTopWidth: 5, borderTopRightRadius: 18 },
+  cornerBL: { left: 0, bottom: 0, borderLeftWidth: 5, borderBottomWidth: 5, borderBottomLeftRadius: 18 },
+  cornerBR: { right: 0, bottom: 0, borderRightWidth: 5, borderBottomWidth: 5, borderBottomRightRadius: 18 },
+  bridgeCan: { position: "absolute", left: 46, top: 28, width: 58, height: 124, borderRadius: 16, backgroundColor: colors.accent },
+  bridgeCanFoam: { position: "absolute", left: 5, right: 5, top: 5, height: 7, borderRadius: 3, backgroundColor: "rgba(255,255,255,.45)" },
+  bridgeBadge: {
+    position: "absolute",
+    right: 30,
+    top: 60,
+    backgroundColor: colors.success,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  bridgeIcon: { fontSize: 56 },
-  bridgeText: { ...typography.heading, textAlign: "center", paddingHorizontal: spacing.md },
-  bridgeButton: { alignSelf: "stretch", marginTop: spacing.md },
+  bridgeBadgeText: { fontFamily: fonts.bodyBold, fontSize: 15, color: "#F0FAE1" },
+  bridgeTitle: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34, color: colors.text },
+  bridgeSubtitle: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.textMuted },
+  bridgeActions: { marginTop: spacing.md, gap: spacing.sm, alignItems: "stretch" },
 });
