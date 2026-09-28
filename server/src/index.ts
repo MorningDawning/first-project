@@ -11,6 +11,14 @@ import { breweriesRouter } from "./routes/breweries";
 import { tasteProfileRouter } from "./routes/tasteProfile";
 import { feedRouter } from "./routes/feed";
 
+// Express 4 doesn't forward a rejected promise from an async route handler
+// to error middleware on its own, and Node kills the whole process on an
+// unhandled rejection by default — so one buggy request would otherwise take
+// the entire API down, register/login included. Log it and keep serving.
+process.on("unhandledRejection", (reason) => {
+  console.error("Необработанная ошибка в асинхронном обработчике:", reason);
+});
+
 const app = express();
 
 app.use(cors());
@@ -32,6 +40,11 @@ app.use("/bar", barRouter);
 app.use("/breweries", breweriesRouter);
 app.use("/taste-profile", tasteProfileRouter);
 app.use("/feed", feedRouter);
+
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error(err);
+  res.status(500).json({ error: "Внутренняя ошибка сервера" });
+});
 
 const port = Number(process.env.PORT) || 4000;
 app.listen(port, () => {
