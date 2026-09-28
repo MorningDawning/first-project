@@ -13,7 +13,7 @@ type Props = { onDone: (openCamera: boolean) => void };
 type Axis = "bitterness" | "body" | "aroma" | "sweetness" | "sourness";
 type Occasion = "classic" | "adventurous";
 type Field = Axis | "targetAbv" | "occasion";
-type Step = "quiz" | "result" | "bridge";
+type Step = "welcome" | "quiz" | "result" | "bridge";
 type Tint = "accent" | "primary";
 
 type Answers = {
@@ -205,7 +205,7 @@ const SCALE_ROWS: { axis: Axis; icon: string; label: string; low: string; high: 
 ];
 
 export function OnboardingScreen({ onDone }: Props) {
-  const [step, setStep] = useState<Step>("quiz");
+  const [step, setStep] = useState<Step>("welcome");
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [selectedValue, setSelectedValue] = useState<number | Occasion | null>(null);
@@ -325,6 +325,40 @@ export function OnboardingScreen({ onDone }: Props) {
 
   return (
     <Screen>
+      {step === "welcome" && (
+        <View style={styles.content}>
+          <Animated.View style={[styles.welcomeBody, animatedStyle]}>
+            <View style={styles.welcomeArt}>
+              <View style={styles.welcomeCircleBig} />
+              <View style={styles.welcomeCircleSmall} />
+              <View style={[styles.welcomeGlass, styles.welcomeGlassStout]} />
+              <View style={[styles.welcomeGlass, styles.welcomeGlassAmber]}>
+                <View style={styles.welcomeGlassFoam} />
+              </View>
+              <View style={[styles.welcomeGlass, styles.welcomeGlassRed]} />
+              <View style={[styles.welcomeBadge, styles.welcomeBadgeMatch]}>
+                <Text style={styles.welcomeBadgeMatchText}>92% твоё</Text>
+              </View>
+              <View style={[styles.welcomeBadge, styles.welcomeBadgeStyle]}>
+                <Text style={styles.welcomeBadgeStyleText}>Stout · 61%</Text>
+              </View>
+            </View>
+
+            <Text style={styles.welcomeTitle}>Найдём пиво, которое зайдёт именно тебе</Text>
+            <Text style={styles.welcomeSubtitle}>
+              7 коротких вопросов — и сканер начнёт показывать процент совпадения для любой банки.
+            </Text>
+
+            <View style={styles.welcomeActions}>
+              <Button title="Начать · 1 минута" onPress={() => transitionTo(() => setStep("quiz"))} />
+              <Pressable onPress={() => onDone(false)} hitSlop={8}>
+                <Text style={styles.welcomeSkip}>Пропустить</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </View>
+      )}
+
       {step === "quiz" && (
         <ScrollView contentContainerStyle={styles.quizScroll}>
           <View style={styles.topRow}>
@@ -527,6 +561,49 @@ const styles = StyleSheet.create({
   progressTrack: { height: 4, borderRadius: 2, backgroundColor: colors.border },
   progressFill: { height: 4, borderRadius: 2, backgroundColor: colors.primary },
   skip: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.textMuted, textDecorationLine: "underline" },
+
+  welcomeBody: { flex: 1, justifyContent: "center", gap: spacing.md },
+  welcomeArt: { height: 220, alignItems: "center", justifyContent: "center", marginBottom: spacing.sm },
+  welcomeCircleBig: {
+    position: "absolute",
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: colors.border,
+  },
+  welcomeCircleSmall: {
+    position: "absolute",
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "#E1EECC",
+    left: 16,
+    top: 110,
+  },
+  welcomeGlass: { position: "absolute", borderRadius: 14 },
+  welcomeGlassStout: { width: 42, height: 78, backgroundColor: colors.text, left: 78, top: 60, transform: [{ rotate: "-6deg" }] },
+  welcomeGlassAmber: { width: 56, height: 104, backgroundColor: colors.accent, left: 128, top: 30 },
+  welcomeGlassFoam: { position: "absolute", left: 5, right: 5, top: 5, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,.5)" },
+  welcomeGlassRed: { width: 40, height: 70, backgroundColor: colors.primary, left: 196, top: 74, transform: [{ rotate: "5deg" }] },
+  welcomeBadge: {
+    position: "absolute",
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  welcomeBadgeMatch: { backgroundColor: colors.success, right: 8, top: 18 },
+  welcomeBadgeMatchText: { fontFamily: fonts.bodyBold, fontSize: 13, color: "#F0FAE1" },
+  welcomeBadgeStyle: { backgroundColor: colors.card, left: 0, top: 140 },
+  welcomeBadgeStyleText: { fontFamily: fonts.bodyBold, fontSize: 12, color: "#8C491A" },
+  welcomeTitle: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34, color: colors.text, textAlign: "center" },
+  welcomeSubtitle: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.textMuted, textAlign: "center" },
+  welcomeActions: { marginTop: spacing.md, gap: spacing.sm, alignItems: "stretch" },
+  welcomeSkip: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textMuted, textAlign: "center", paddingVertical: spacing.xs },
 
   quizBody: { flex: 1, justifyContent: "center", gap: spacing.lg },
   questionLabel: { fontFamily: fonts.display, fontSize: 24, color: colors.primary, textAlign: "center" },
