@@ -80,3 +80,11 @@ export type TasteProfileResponse = {
   beersScanned: number;
   hasEnoughData: boolean;
 };
+
+export type TastePersona = { title: string; tagline: string; category: string };
+
+export type QuizResult = {
+  profile: TasteProfile;
+  persona: TastePersona;
+  recommendedBeer: BeerSummary | null;
+};

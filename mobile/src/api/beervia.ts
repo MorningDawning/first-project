@@ -5,6 +5,7 @@ import {
   BeerSummary,
   Brewery,
   FriendPost,
+  QuizResult,
   TasteProfileResponse,
   UserProfile,
 } from "../types";
@@ -62,8 +63,15 @@ export const breweriesApi = {
 
 export const tasteProfileApi = {
   get: () => api.get<TasteProfileResponse>("/taste-profile").then((r) => r.data),
-  submitQuiz: (answers: { bitterness: number; body: number; aroma: number }) =>
-    api.post<TasteProfileResponse>("/taste-profile/quiz", answers).then((r) => r.data),
+  submitQuiz: (answers: {
+    bitterness: number;
+    body: number;
+    aroma: number;
+    sweetness: number;
+    sourness: number;
+    targetAbv: number;
+    occasion: "classic" | "adventurous";
+  }) => api.post<QuizResult>("/taste-profile/quiz", answers).then((r) => r.data),
 };
 
 export const feedApi = {

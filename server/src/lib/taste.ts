@@ -81,6 +81,56 @@ export async function computeUserTasteProfile(userId: string): Promise<TasteVect
   return profile;
 }
 
+type AxisWords = { low: string; high: string; lowTag: string; highTag: string };
+
+const AXIS_WORDS: Record<keyof TasteVector, AxisWords> = {
+  sweetness: { low: "Сухой", high: "Сладкий", lowTag: "Сухое", highTag: "Сладкое" },
+  bitterness: { low: "Мягкий", high: "Хмелевой", lowTag: "Мягкая горечь", highTag: "Выраженная горечь" },
+  sourness: { low: "Гладкий", high: "Кислый", lowTag: "Без кислинки", highTag: "С лёгкой кислинкой" },
+  body: { low: "Лёгкий", high: "Плотный", lowTag: "Лёгкое тело", highTag: "Плотное тело" },
+  aroma: { low: "Сдержанный", high: "Ароматный", lowTag: "Сдержанный аромат", highTag: "Яркий аромат хмеля" },
+};
+
+export type TastePersona = { title: string; tagline: string; category: string };
+
+/**
+ * Turns a taste vector into a short, Vivino-style "identity" — a two-word
+ * headline (bitterness + body, the two most defining beer traits), a
+ * tagline listing the rest, and a category flavored by the quiz's
+ * "occasion" question.
+ */
+export function buildPersona(profile: TasteVector, occasion: "classic" | "adventurous"): TastePersona {
+  const word = (axis: keyof TasteVector) => (profile[axis] >= 50 ? AXIS_WORDS[axis].high : AXIS_WORDS[axis].low);
+  const tag = (axis: keyof TasteVector) => (profile[axis] >= 50 ? AXIS_WORDS[axis].highTag : AXIS_WORDS[axis].lowTag);
+
+  const title = `${word("bitterness")} & ${word("body")}`;
+  const tagline = (["sweetness", "sourness", "aroma"] as (keyof TasteVector)[]).map(tag).join(" · ");
+  const category =
+    occasion === "adventurous" ? "Для искателей нового вкуса" : "Для тех, кто любит проверенное";
+
+  return { title, tagline, category };
+}
+
+/**
+ * Best-matching beer for a declared taste profile, factoring in a target
+ * ABV from the quiz's strength question alongside the taste-vector match.
+ */
+export async function recommendBeerForProfile(profile: TasteVector, targetAbv: number) {
+  const beers = await prisma.beer.findMany({ include: { brewery: true } });
+  if (beers.length === 0) return null;
+
+  let best = beers[0];
+  let bestScore = -Infinity;
+  for (const b of beers) {
+    const score = matchPercent(profile, tasteVector(b)) - Math.abs(b.abv - targetAbv) * 3;
+    if (score > bestScore) {
+      bestScore = score;
+      best = b;
+    }
+  }
+  return best;
+}
+
 export async function findSimilarBeers(beer: Beer, limit = 4) {
   const candidates = await prisma.beer.findMany({
     where: { id: { not: beer.id } },
