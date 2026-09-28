@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MainTabParamList } from "./types";
 import { HomeNavigator } from "./HomeNavigator";
@@ -7,17 +7,18 @@ import { LibraryNavigator } from "./LibraryNavigator";
 import { BarNavigator } from "./BarNavigator";
 import { ProfileNavigator } from "./ProfileNavigator";
 import { CameraScanScreen } from "../screens/scan/CameraScanScreen";
+import { BarIcon, CameraIcon, HomeIcon, IconProps, LibraryIcon, ProfileIcon } from "../components/icons/TabIcons";
 import { colors } from "../theme/colors";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 type RegularTabName = Exclude<keyof MainTabParamList, "CameraTab">;
 
-const ICONS: Record<RegularTabName, string> = {
-  HomeTab: "🏠",
-  LibraryTab: "📚",
-  BarTab: "🍻",
-  ProfileTab: "👤",
+const ICONS: Record<RegularTabName, (props: IconProps) => React.JSX.Element> = {
+  HomeTab: HomeIcon,
+  LibraryTab: LibraryIcon,
+  BarTab: BarIcon,
+  ProfileTab: ProfileIcon,
 };
 
 const LABELS: Record<RegularTabName, string> = {
@@ -39,9 +40,10 @@ export function MainTabNavigator({ initialRouteName }: Props) {
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
         tabBarLabel: LABELS[route.name as RegularTabName],
-        tabBarIcon: ({ color }) => (
-          <Text style={{ fontSize: 20, color }}>{ICONS[route.name as RegularTabName]}</Text>
-        ),
+        tabBarIcon: ({ color }) => {
+          const Icon = ICONS[route.name as RegularTabName];
+          return <Icon color={color} size={22} />;
+        },
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeNavigator} />
@@ -55,7 +57,7 @@ export function MainTabNavigator({ initialRouteName }: Props) {
           tabBarLabel: () => null,
           tabBarIcon: () => (
             <View style={styles.cameraBadge}>
-              <Text style={styles.cameraBadgeIcon}>📷</Text>
+              <CameraIcon color="#fff" size={22} />
             </View>
           ),
         }}
@@ -79,5 +81,4 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
   },
-  cameraBadgeIcon: { fontSize: 20 },
 });
