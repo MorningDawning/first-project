@@ -81,6 +81,8 @@ export type TasteProfileResponse = {
   profile: TasteProfile | null;
   favoriteStyle: string | null;
   beersScanned: number;
+  stylesTried: number;
+  personaTitle: string | null;
   hasEnoughData: boolean;
 };
 

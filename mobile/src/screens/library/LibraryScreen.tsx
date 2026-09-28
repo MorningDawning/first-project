@@ -7,7 +7,7 @@ import { BeerCard } from "../../components/BeerCard";
 import { EmptyView, ErrorView, LoadingView } from "../../components/StateViews";
 import { beersApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
-import { colors, radius, spacing, typography } from "../../theme/colors";
+import { colors, fonts, radius, spacing } from "../../theme/colors";
 import { LibraryStackParamList } from "../../navigation/types";
 import { BeerSummary } from "../../types";
 
@@ -31,6 +31,9 @@ export function LibraryScreen() {
     setLoading(true);
     try {
       const results = await beersApi.search({ q: query || undefined, style: activeStyle || undefined });
+      // По умолчанию сортируем по совпадению со вкусом — так библиотека сразу
+      // ведёт к тому, что вероятнее понравится, а не к алфавиту.
+      results.sort((a, b) => (b.matchPercent ?? -1) - (a.matchPercent ?? -1));
       setBeers(results);
     } catch (e) {
       setError(apiErrorMessage(e, "Не удалось загрузить библиотеку"));
@@ -48,13 +51,16 @@ export function LibraryScreen() {
     <Screen>
       <View style={styles.header}>
         <Text style={styles.title}>Библиотека</Text>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Поиск по названию, пивоварне, стилю"
-          placeholderTextColor={colors.textMuted}
-          style={styles.search}
-        />
+        <View style={styles.searchWrap}>
+          <Text style={styles.searchIcon}>⚲</Text>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Название, пивоварня, стиль"
+            placeholderTextColor={colors.textMuted}
+            style={styles.search}
+          />
+        </View>
       </View>
 
       {styles_.length > 0 && (
@@ -77,6 +83,13 @@ export function LibraryScreen() {
             );
           }}
         />
+      )}
+
+      {!loading && !error && beers.length > 0 && (
+        <View style={styles.metaRow}>
+          <Text style={styles.metaCount}>{beers.length} {pluralBeers(beers.length)}</Text>
+          <Text style={styles.metaSort}>По совпадению ↓</Text>
+        </View>
       )}
 
       {loading ? (
@@ -106,32 +119,47 @@ export function LibraryScreen() {
   );
 }
 
+function pluralBeers(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "сорт";
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "сорта";
+  return "сортов";
+}
+
 const styles = StyleSheet.create({
   header: { padding: spacing.lg, paddingBottom: spacing.sm },
-  title: { ...typography.title, marginBottom: spacing.sm },
-  search: {
+  title: { fontFamily: fonts.display, fontSize: 26, color: colors.text, marginBottom: spacing.md },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
     backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    fontSize: 15,
-    color: colors.text,
+    height: 50,
   },
-  filtersList: { flexGrow: 0, height: 48, marginBottom: spacing.sm },
+  searchIcon: { fontSize: 16, color: colors.textMuted },
+  search: { flex: 1, fontFamily: fonts.body, fontSize: 15, color: colors.text },
+  filtersList: { flexGrow: 0, height: 48, marginBottom: spacing.xs },
   filters: { paddingHorizontal: spacing.lg, alignItems: "center" },
   filterChip: {
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.card,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md + 2,
     paddingVertical: spacing.sm,
     marginRight: spacing.sm,
   },
-  filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { color: colors.text, fontSize: 13, lineHeight: 16 },
-  filterTextActive: { color: "#fff", fontWeight: "700" },
+  filterChipActive: { backgroundColor: colors.text },
+  filterText: { fontFamily: fonts.bodySemiBold, color: colors.text, fontSize: 13, lineHeight: 16 },
+  filterTextActive: { color: colors.background },
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  metaCount: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.textMuted },
+  metaSort: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.text },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 });

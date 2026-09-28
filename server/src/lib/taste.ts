@@ -93,22 +93,25 @@ const AXIS_WORDS: Record<keyof TasteVector, AxisWords> = {
 
 export type TastePersona = { title: string; tagline: string; category: string };
 
+/** Two-word headline (bitterness + body, the two most defining beer traits). */
+export function personaTitle(profile: TasteVector): string {
+  const word = (axis: keyof TasteVector) => (profile[axis] >= 50 ? AXIS_WORDS[axis].high : AXIS_WORDS[axis].low);
+  return `${word("bitterness")} & ${word("body")}`;
+}
+
 /**
- * Turns a taste vector into a short, Vivino-style "identity" — a two-word
- * headline (bitterness + body, the two most defining beer traits), a
- * tagline listing the rest, and a category flavored by the quiz's
+ * Turns a taste vector into a short, Vivino-style "identity" — the headline
+ * above, a tagline listing the rest, and a category flavored by the quiz's
  * "occasion" question.
  */
 export function buildPersona(profile: TasteVector, occasion: "classic" | "adventurous"): TastePersona {
-  const word = (axis: keyof TasteVector) => (profile[axis] >= 50 ? AXIS_WORDS[axis].high : AXIS_WORDS[axis].low);
   const tag = (axis: keyof TasteVector) => (profile[axis] >= 50 ? AXIS_WORDS[axis].highTag : AXIS_WORDS[axis].lowTag);
 
-  const title = `${word("bitterness")} & ${word("body")}`;
   const tagline = (["sweetness", "sourness", "aroma"] as (keyof TasteVector)[]).map(tag).join(" · ");
   const category =
     occasion === "adventurous" ? "Для искателей нового вкуса" : "Для тех, кто любит проверенное";
 
-  return { title, tagline, category };
+  return { title: personaTitle(profile), tagline, category };
 }
 
 /**

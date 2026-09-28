@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
-import { buildPersona, computeUserTasteProfile, matchPercent, recommendBeerForProfile, tasteVector } from "../lib/taste";
+import { buildPersona, computeUserTasteProfile, matchPercent, personaTitle, recommendBeerForProfile, tasteVector } from "../lib/taste";
 import { serializeBeer } from "../lib/serialize";
 
 export const tasteProfileRouter = Router();
@@ -73,6 +73,8 @@ tasteProfileRouter.get("/", requireAuth, async (req, res) => {
     profile,
     favoriteStyle,
     beersScanned: new Set(scans.map((s) => s.beerId)).size,
+    stylesTried: styleCounts.size,
+    personaTitle: profile ? personaTitle(profile) : null,
     hasEnoughData: profile !== null,
   });
 });
