@@ -57,6 +57,7 @@ export const scanApi = {
 
 export const barApi = {
   list: () => api.get<BarEntry[]>("/bar").then((r) => r.data),
+  add: (beerId: string) => api.post(`/bar/${beerId}`).then((r) => r.data),
 };
 
 export const breweriesApi = {

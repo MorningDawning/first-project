@@ -31,3 +31,14 @@ barRouter.get("/", requireAuth, async (req, res) => {
     }))
   );
 });
+
+// POST /bar/:beerId — manually log a beer without going through the scanner
+// (e.g. "В мой бар" from the beer detail page). Same ScanHistory row a real
+// scan would create.
+barRouter.post("/:beerId", requireAuth, async (req, res) => {
+  const beer = await prisma.beer.findUnique({ where: { id: req.params.beerId } });
+  if (!beer) return res.status(404).json({ error: "Пиво не найдено" });
+
+  await prisma.scanHistory.create({ data: { userId: req.userId!, beerId: beer.id } });
+  res.status(201).json({ ok: true });
+});
