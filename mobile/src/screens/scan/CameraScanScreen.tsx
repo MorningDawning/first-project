@@ -6,10 +6,12 @@ import * as ImagePicker from "expo-image-picker";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { Button } from "../../components/Button";
+import { MatchRing } from "../../components/MatchRing";
 import { scanApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
-import { colors, radius, spacing } from "../../theme/colors";
+import { colors, fonts, radius, spacing } from "../../theme/colors";
 import { MainTabParamList } from "../../navigation/types";
+import { BeerDetail } from "../../types";
 
 type Nav = BottomTabNavigationProp<MainTabParamList, "CameraTab">;
 
@@ -21,6 +23,7 @@ export function CameraScanScreen() {
   const [torch, setTorch] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [found, setFound] = useState<BeerDetail | null>(null);
   // Останавливаем рендер CameraView сразу после съёмки/выбора фото, не дожидаясь
   // навигации — иначе нативная камера-сессия иногда остаётся «висеть» в фоне
   // (iOS показывает системную плашку «вернуться к камере» поверх других экранов).
@@ -28,23 +31,38 @@ export function CameraScanScreen() {
   // остаётся смонтированной при переходе на другие вкладки, так что без этого
   // объектив продолжал бы работать в фоне.
   const [cameraActive, setCameraActive] = useState(true);
-  const cameraVisible = cameraActive && isFocused;
+  const cameraVisible = cameraActive && isFocused && !found;
 
   async function submitPhoto(uri: string) {
     setError(null);
     setScanning(true);
     try {
       const beer = await scanApi.scan(uri);
-      // Результат показываем во вкладке «Главная», а не поверх камеры — так вкладка
-      // «Скан» остаётся отдельным инструментом, а «Назад» с карточки ведёт на Главную.
-      navigation.navigate("HomeTab", { screen: "BeerDetail", params: { beerId: beer.id } });
-      setCameraActive(true);
+      // Показываем мини-карточку с результатом прямо здесь — переход на
+      // карточку пива только по явному тапу «Открыть».
+      setFound(beer);
     } catch (e) {
       setError(apiErrorMessage(e, "Не удалось распознать пиво"));
       setCameraActive(true);
     } finally {
       setScanning(false);
     }
+  }
+
+  function openFound() {
+    if (!found) return;
+    const beerId = found.id;
+    setFound(null);
+    setCameraActive(true);
+    // Результат показываем во вкладке «Главная», а не поверх камеры — так вкладка
+    // «Скан» остаётся отдельным инструментом, а «Назад» с карточки ведёт на Главную.
+    navigation.navigate("HomeTab", { screen: "BeerDetail", params: { beerId } });
+  }
+
+  function scanAgain() {
+    setFound(null);
+    setError(null);
+    setCameraActive(true);
   }
 
   async function handleCapture() {
@@ -80,7 +98,7 @@ export function CameraScanScreen() {
       <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
         <View style={styles.topBar}>
           <RoundIconButton icon="✕" onPress={() => navigation.navigate("HomeTab", { screen: "Home" })} />
-          {permission?.granted && (
+          {permission?.granted && !found && (
             <RoundIconButton icon={torch ? "⚡️" : "⚡"} active={torch} onPress={() => setTorch((t) => !t)} />
           )}
         </View>
@@ -91,39 +109,65 @@ export function CameraScanScreen() {
             <Button title="Разрешить доступ" variant="light" onPress={requestPermission} />
           </View>
         ) : (
-          <View style={styles.viewfinderWrap} pointerEvents="none">
-            <View style={styles.viewfinder}>
-              <View style={[styles.corner, styles.cornerTL]} />
-              <View style={[styles.corner, styles.cornerTR]} />
-              <View style={[styles.corner, styles.cornerBL]} />
-              <View style={[styles.corner, styles.cornerBR]} />
+          !found && (
+            <View style={styles.viewfinderWrap} pointerEvents="none">
+              <View style={styles.viewfinder}>
+                <View style={[styles.corner, styles.cornerTL]} />
+                <View style={[styles.corner, styles.cornerTR]} />
+                <View style={[styles.corner, styles.cornerBL]} />
+                <View style={[styles.corner, styles.cornerBR]} />
+              </View>
+            </View>
+          )
+        )}
+
+        {found ? (
+          <View style={styles.bottomArea}>
+            <Pressable onPress={openFound} style={styles.foundCard}>
+              <MatchRing percent={found.matchPercent ?? 0} size={52} strokeWidth={5}>
+                <Text style={styles.foundRingText}>{found.matchPercent ?? "–"}%</Text>
+              </MatchRing>
+              <View style={styles.foundInfo}>
+                <Text style={styles.foundName} numberOfLines={1}>{found.name}</Text>
+                <Text style={styles.foundMeta} numberOfLines={1}>{found.brewery.name} · {found.style}</Text>
+              </View>
+              <View style={styles.foundOpenBtn}>
+                <Text style={styles.foundOpenText}>Открыть</Text>
+              </View>
+            </Pressable>
+            <Pressable onPress={scanAgain} hitSlop={8}>
+              <Text style={styles.scanAgain}>Сканировать ещё раз</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.bottomArea}>
+            <View style={[styles.hintPill, error && styles.hintPillError]}>
+              <Text style={styles.hintText}>
+                {error ?? (scanning ? "Распознаём этикетку…" : "Держите банку ровно в кадре")}
+              </Text>
+            </View>
+
+            <View style={styles.controlsRow}>
+              <RoundIconButton icon="🖼️" onPress={handlePickFromGallery} disabled={scanning} />
+              <Pressable
+                onPress={handleCapture}
+                disabled={!permission?.granted || scanning}
+                style={({ pressed }) => [
+                  styles.shutter,
+                  (pressed || scanning) && styles.shutterActive,
+                  !permission?.granted && styles.shutterDisabled,
+                ]}
+              >
+                {scanning && <View style={styles.shutterSpinnerRing} />}
+              </Pressable>
+              <RoundIconButton
+                icon="🕘"
+                onPress={() => navigation.navigate("BarTab", { screen: "BarHome" })}
+                disabled={scanning}
+              />
             </View>
           </View>
         )}
-
-        <View style={styles.bottomArea}>
-          <View style={[styles.hintPill, error && styles.hintPillError]}>
-            <Text style={styles.hintText}>
-              {error ?? (scanning ? "Распознаём этикетку…" : "Держите банку ровно в кадре")}
-            </Text>
-          </View>
-
-          <View style={styles.controlsRow}>
-            <RoundIconButton icon="🖼️" onPress={handlePickFromGallery} disabled={scanning} />
-            <Pressable
-              onPress={handleCapture}
-              disabled={!permission?.granted || scanning}
-              style={({ pressed }) => [
-                styles.shutter,
-                (pressed || scanning) && styles.shutterActive,
-                !permission?.granted && styles.shutterDisabled,
-              ]}
-            >
-              {scanning && <View style={styles.shutterSpinnerRing} />}
-            </Pressable>
-            <View style={styles.controlsSpacer} />
-          </View>
-        </View>
       </SafeAreaView>
     </View>
   );
@@ -157,11 +201,11 @@ function RoundIconButton({
 }
 
 const SHUTTER_SIZE = 74;
-const CORNER_SIZE = 32;
-const CORNER_THICKNESS = 4;
+const CORNER_SIZE = 44;
+const CORNER_THICKNESS = 5;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#000" },
+  root: { flex: 1, backgroundColor: "#1F1C19" },
   overlay: { flex: 1, justifyContent: "space-between" },
 
   topBar: {
@@ -172,10 +216,10 @@ const styles = StyleSheet.create({
   },
 
   roundButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "rgba(245,234,216,0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -197,10 +241,10 @@ const styles = StyleSheet.create({
   viewfinderWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
   viewfinder: { width: "72%", aspectRatio: 0.85 },
   corner: { position: "absolute", width: CORNER_SIZE, height: CORNER_SIZE, borderColor: colors.accent },
-  cornerTL: { top: 0, left: 0, borderTopWidth: CORNER_THICKNESS, borderLeftWidth: CORNER_THICKNESS, borderTopLeftRadius: radius.md },
-  cornerTR: { top: 0, right: 0, borderTopWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS, borderTopRightRadius: radius.md },
-  cornerBL: { bottom: 0, left: 0, borderBottomWidth: CORNER_THICKNESS, borderLeftWidth: CORNER_THICKNESS, borderBottomLeftRadius: radius.md },
-  cornerBR: { bottom: 0, right: 0, borderBottomWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS, borderBottomRightRadius: radius.md },
+  cornerTL: { top: 0, left: 0, borderTopWidth: CORNER_THICKNESS, borderLeftWidth: CORNER_THICKNESS, borderTopLeftRadius: 26 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS, borderTopRightRadius: 26 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: CORNER_THICKNESS, borderLeftWidth: CORNER_THICKNESS, borderBottomLeftRadius: 26 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS, borderBottomRightRadius: 26 },
 
   bottomArea: { gap: spacing.lg, paddingBottom: spacing.md, alignItems: "center" },
 
@@ -221,7 +265,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     alignSelf: "stretch",
   },
-  controlsSpacer: { width: 44, height: 44 },
 
   shutter: {
     width: SHUTTER_SIZE,
@@ -242,4 +285,22 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.primary,
   },
+
+  foundCard: {
+    marginHorizontal: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: radius.xl,
+    padding: spacing.sm + 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm + 2,
+    alignSelf: "stretch",
+  },
+  foundRingText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.text },
+  foundInfo: { flex: 1, gap: 2 },
+  foundName: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.text },
+  foundMeta: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
+  foundOpenBtn: { backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  foundOpenText: { fontFamily: fonts.display, fontSize: 15, color: colors.background },
+  scanAgain: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: "rgba(245,234,216,0.8)" },
 });

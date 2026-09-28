@@ -8,7 +8,7 @@ import { BarNavigator } from "./BarNavigator";
 import { ProfileNavigator } from "./ProfileNavigator";
 import { CameraScanScreen } from "../screens/scan/CameraScanScreen";
 import { BarIcon, CameraIcon, HomeIcon, IconProps, LibraryIcon, ProfileIcon } from "../components/icons/TabIcons";
-import { colors } from "../theme/colors";
+import { colors, fonts } from "../theme/colors";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -38,18 +38,17 @@ export function MainTabNavigator({ initialRouteName }: Props) {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabBarLabel,
         tabBarLabel: LABELS[route.name as RegularTabName],
         tabBarIcon: ({ color }) => {
           const Icon = ICONS[route.name as RegularTabName];
-          return <Icon color={color} size={22} />;
+          return <Icon color={color} size={24} />;
         },
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeNavigator} />
       <Tab.Screen name="LibraryTab" component={LibraryNavigator} />
-      <Tab.Screen name="BarTab" component={BarNavigator} />
-      <Tab.Screen name="ProfileTab" component={ProfileNavigator} />
       <Tab.Screen
         name="CameraTab"
         component={CameraScanScreen}
@@ -57,28 +56,39 @@ export function MainTabNavigator({ initialRouteName }: Props) {
           tabBarLabel: () => null,
           tabBarIcon: () => (
             <View style={styles.cameraBadge}>
-              <CameraIcon color="#fff" size={22} />
+              <CameraIcon color="#fff" size={26} />
             </View>
           ),
         }}
       />
+      <Tab.Screen name="BarTab" component={BarNavigator} />
+      <Tab.Screen name="ProfileTab" component={ProfileNavigator} />
     </Tab.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
+  tabBar: {
+    height: 88,
+    paddingTop: 10,
+    backgroundColor: colors.card,
+    borderTopColor: colors.border,
+  },
+  tabBarLabel: { fontFamily: fonts.bodySemiBold, fontSize: 11 },
   cameraBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginTop: -14,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    marginTop: -28,
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 5,
+    borderWidth: 6,
+    borderColor: colors.background,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 8,
   },
 });

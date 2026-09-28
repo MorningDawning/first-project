@@ -33,8 +33,14 @@ export const beersApi = {
     api.get<BeerSummary[]>("/beers", { params }).then((r) => r.data),
   styles: () => api.get<string[]>("/beers/styles").then((r) => r.data),
   detail: (id: string) => api.get<BeerDetail>(`/beers/${id}`).then((r) => r.data),
-  review: (id: string, rating: number, text?: string) =>
-    api.post(`/beers/${id}/reviews`, { rating, text }).then((r) => r.data),
+  review: (id: string, rating: number, text?: string, tags?: string[]) =>
+    api.post(`/beers/${id}/reviews`, { rating, text, tags }).then((r) => r.data),
+};
+
+export const wishlistApi = {
+  list: () => api.get<BeerSummary[]>("/wishlist").then((r) => r.data),
+  add: (beerId: string) => api.post(`/wishlist/${beerId}`).then((r) => r.data),
+  remove: (beerId: string) => api.delete(`/wishlist/${beerId}`).then((r) => r.data),
 };
 
 export const scanApi = {

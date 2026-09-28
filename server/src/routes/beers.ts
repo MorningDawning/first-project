@@ -32,8 +32,13 @@ beersRouter.get("/", requireAuth, async (req, res) => {
   });
 
   const profile = await computeUserTasteProfile(req.userId!);
+  const wishlisted = await prisma.wishlist.findMany({ where: { userId: req.userId! }, select: { beerId: true } });
+  const wishlistedIds = new Set(wishlisted.map((w) => w.beerId));
+
   res.json(
-    beers.map((b) => serializeBeer(b, profile ? matchPercent(profile, tasteVector(b)) : null))
+    beers.map((b) =>
+      serializeBeer(b, profile ? matchPercent(profile, tasteVector(b)) : null, wishlistedIds.has(b.id))
+    )
   );
 });
 
@@ -54,13 +59,20 @@ beersRouter.get("/:id", requireAuth, async (req, res) => {
 
   const profile = await computeUserTasteProfile(req.userId!);
   const similar = await findSimilarBeers(beer, 4);
+  const isWishlisted =
+    (await prisma.wishlist.findUnique({
+      where: { userId_beerId: { userId: req.userId!, beerId: beer.id } },
+    })) !== null;
 
-  res.json(serializeBeerDetail(beer, profile ? matchPercent(profile, tasteVector(beer)) : null, similar));
+  res.json(
+    serializeBeerDetail(beer, profile ? matchPercent(profile, tasteVector(beer)) : null, similar, isWishlisted)
+  );
 });
 
 const reviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   text: z.string().max(1000).optional(),
+  tags: z.array(z.string()).max(10).optional(),
 });
 
 beersRouter.post("/:id/reviews", requireAuth, async (req, res) => {
@@ -70,11 +82,14 @@ beersRouter.post("/:id/reviews", requireAuth, async (req, res) => {
   const beer = await prisma.beer.findUnique({ where: { id: req.params.id } });
   if (!beer) return res.status(404).json({ error: "Пиво не найдено" });
 
+  const { tags, ...rest } = parsed.data;
+  const data = { ...rest, tags: JSON.stringify(tags ?? []) };
+
   const review = await prisma.review.upsert({
     where: { beerId_userId: { beerId: beer.id, userId: req.userId! } },
-    update: parsed.data,
-    create: { ...parsed.data, beerId: beer.id, userId: req.userId! },
+    update: data,
+    create: { ...data, beerId: beer.id, userId: req.userId! },
   });
 
-  res.status(201).json(review);
+  res.status(201).json({ ...review, tags: JSON.parse(review.tags) });
 });

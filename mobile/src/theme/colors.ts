@@ -20,17 +20,27 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 8,
-  md: 14,
-  lg: 20,
+  sm: 10,
+  md: 18,
+  lg: 28,
+  xl: 36,
   pill: 999,
 };
 
+/** Caprasimo (rounded display serif) for headlines, Figtree for everything else. */
+export const fonts = {
+  display: "Caprasimo_400Regular",
+  body: "Figtree_400Regular",
+  bodyMedium: "Figtree_500Medium",
+  bodySemiBold: "Figtree_600SemiBold",
+  bodyBold: "Figtree_700Bold",
+};
+
 export const typography = {
-  title: { fontSize: 24, fontWeight: "700" as const, color: colors.text },
-  heading: { fontSize: 18, fontWeight: "700" as const, color: colors.text },
-  body: { fontSize: 15, fontWeight: "400" as const, color: colors.text },
-  caption: { fontSize: 13, fontWeight: "400" as const, color: colors.textMuted },
+  title: { fontFamily: fonts.display, fontSize: 28, color: colors.text },
+  heading: { fontFamily: fonts.display, fontSize: 20, color: colors.text },
+  body: { fontFamily: fonts.body, fontSize: 15, color: colors.text },
+  caption: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
 };
 
 /** Match% → color: warm for low overlap, success green for a strong taste match. */
@@ -38,4 +48,11 @@ export function matchColor(percent: number): string {
   if (percent >= 75) return colors.success;
   if (percent >= 50) return colors.accent;
   return colors.primary;
+}
+
+/** Match% → a light tinted pill (bg) + matching darker text (fg), Vivino-style soft badges. */
+export function matchTint(percent: number): { bg: string; fg: string } {
+  if (percent >= 75) return { bg: "#E1EECC", fg: colors.success };
+  if (percent >= 50) return { bg: "#FBE2D8", fg: "#8C491A" };
+  return { bg: "#EEE7DB", fg: colors.textMuted };
 }

@@ -28,12 +28,14 @@ export type BeerSummary = {
   tasteProfile: TasteProfile;
   foodPairings: string[];
   matchPercent: number | null;
+  isWishlisted: boolean;
 };
 
 export type Review = {
   id: string;
   rating: number;
   text: string | null;
+  tags: string[];
   createdAt: string;
   user: { id: string; name: string; avatarUrl: string | null };
 };
@@ -47,6 +49,7 @@ export type BeerDetail = BeerSummary & {
 export type BarEntry = {
   scanId: string;
   scannedAt: string;
+  rating: number | null;
   beer: {
     id: string;
     name: string;

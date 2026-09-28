@@ -1,13 +1,13 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { matchColor, radius, spacing } from "../theme/colors";
+import { fonts, matchTint, radius, spacing } from "../theme/colors";
 
 export function MatchBadge({ percent, size = "md" }: { percent: number; size?: "sm" | "md" }) {
-  const color = matchColor(percent);
+  const { bg, fg } = matchTint(percent);
   const small = size === "sm";
   return (
-    <View style={[styles.badge, { backgroundColor: color }, small && styles.badgeSmall]}>
-      <Text style={[styles.text, small && styles.textSmall]}>{percent}% совпадение</Text>
+    <View style={[styles.badge, { backgroundColor: bg }, small && styles.badgeSmall]}>
+      <Text style={[styles.text, { color: fg }, small && styles.textSmall]}>{percent}%</Text>
     </View>
   );
 }
@@ -20,6 +20,6 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   badgeSmall: { paddingHorizontal: spacing.sm, paddingVertical: 3 },
-  text: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  textSmall: { fontSize: 11 },
+  text: { fontFamily: fonts.bodyBold, fontSize: 13 },
+  textSmall: { fontSize: 12 },
 });

@@ -27,6 +27,7 @@ model User {
   reviews       Review[]
   scans         ScanHistory[]
   posts         FriendPost[]
+  wishlist      Wishlist[]
   friendsFrom   Friendship[]  @relation("FriendshipFrom")
   friendsTo     Friendship[]  @relation("FriendshipTo")
 }
@@ -62,9 +63,10 @@ model Beer {
 
   foodPairings String // JSON-encoded string array
 
-  brewery Brewery       @relation(fields: [breweryId], references: [id])
-  reviews Review[]
-  scans   ScanHistory[]
+  brewery  Brewery       @relation(fields: [breweryId], references: [id])
+  reviews  Review[]
+  scans    ScanHistory[]
+  wishlist Wishlist[]
 }
 
 model Review {
@@ -73,12 +75,25 @@ model Review {
   userId    String
   rating    Int // 1-5
   text      String?
+  tags      String   @default("[]") // JSON-encoded string array — flavor notes tapped on the rating sheet
   createdAt DateTime @default(now())
 
   beer Beer @relation(fields: [beerId], references: [id])
   user User @relation(fields: [userId], references: [id])
 
   @@unique([beerId, userId])
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  beerId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  beer Beer @relation(fields: [beerId], references: [id])
+
+  @@unique([userId, beerId])
 }
 
 model ScanHistory {

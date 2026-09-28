@@ -39,6 +39,14 @@
         {
           "photosPermission": "BeerVia использует галерею, чтобы распознать пиво по выбранному фото."
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#FBF3E7",
+          "resizeMode": "contain"
+        }
       ]
     ]
   }

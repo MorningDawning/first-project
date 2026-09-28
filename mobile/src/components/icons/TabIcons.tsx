@@ -1,54 +1,42 @@
 import React from "react";
-import Svg, { Circle, Path, Rect } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 
 export type IconProps = { color: string; size?: number };
 
-export function HomeIcon({ color, size = 24 }: IconProps) {
+function StrokeIcon({ d, color, size = 24 }: IconProps & { d: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M3 12 L12 4 L21 12" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Rect x="5.5" y="12" width="13" height="8" rx="1" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+      <Path d={d} stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
 
-export function LibraryIcon({ color, size = 24 }: IconProps) {
+export function HomeIcon(props: IconProps) {
+  return <StrokeIcon {...props} d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />;
+}
+
+export function LibraryIcon(props: IconProps) {
+  return <StrokeIcon {...props} d="M10 2h4v3l2 3v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8l2-3zM8 12h8" />;
+}
+
+export function BarIcon(props: IconProps) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M10 3 H14 V6 C14 6 17 7.5 17 10.5 V19 A2 2 0 0 1 15 21 H9 A2 2 0 0 1 7 19 V10.5 C7 7.5 10 6 10 6 Z"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinejoin="round"
-      />
-    </Svg>
+    <StrokeIcon
+      {...props}
+      d="M5 8h11v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM16 10h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2M9 12v5M12 12v5"
+    />
   );
 }
 
-export function BarIcon({ color, size = 24 }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x="5" y="6" width="10" height="14" rx="2" stroke={color} strokeWidth={2} strokeLinejoin="round" />
-      <Path d="M15 9 C19.5 9 19.5 15.5 15 15.5" stroke={color} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
+export function ProfileIcon(props: IconProps) {
+  return <StrokeIcon {...props} d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" />;
 }
 
-export function ProfileIcon({ color, size = 24 }: IconProps) {
+export function CameraIcon(props: IconProps) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="8" r="4" stroke={color} strokeWidth={2} />
-      <Path d="M4 20 C4 15 8 13 12 13 C16 13 20 15 20 20" stroke={color} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-export function CameraIcon({ color, size = 24 }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x="9" y="4" width="6" height="3" rx="1" stroke={color} strokeWidth={2} strokeLinejoin="round" />
-      <Rect x="3" y="7" width="18" height="13" rx="2" stroke={color} strokeWidth={2} strokeLinejoin="round" />
-      <Circle cx="12" cy="13.5" r="4" stroke={color} strokeWidth={2} />
-    </Svg>
+    <StrokeIcon
+      {...props}
+      d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"
+    />
   );
 }
