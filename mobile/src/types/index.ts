@@ -59,12 +59,81 @@ export type BarEntry = {
   };
 };
 
-export type FriendPost = {
+export type UserBrief = { id: string; name: string; username: string | null; avatarUrl: string | null };
+
+export type FriendStatus = "self" | "none" | "friends" | "outgoing" | "incoming";
+
+export type PostBeer = {
+  id: string;
+  name: string;
+  style: string;
+  imageUrl: string | null;
+  brewery: { id: string; name: string };
+  matchPercent: number | null;
+};
+
+export type FeedPost = {
   id: string;
   text: string;
-  imageUrl: string | null;
+  place: string | null;
+  visibility: "friends" | "all";
+  photos: string[];
   createdAt: string;
-  user: { id: string; name: string; avatarUrl: string | null };
+  rating: number | null;
+  user: UserBrief;
+  beer: PostBeer | null;
+  likeCount: number;
+  likedByMe: boolean;
+  commentCount: number;
+  /** Есть у постов из «Для тебя» и на экране поста: кем автор приходится мне. */
+  author?: { friendStatus: FriendStatus; mutualFriends: number; requestId?: string | null };
+  canDelete?: boolean;
+};
+
+export type PostComment = {
+  id: string;
+  text: string;
+  createdAt: string;
+  parentId: string | null;
+  user: UserBrief;
+  likeCount: number;
+  likedByMe: boolean;
+  canDelete: boolean;
+};
+
+export type FeedPage = { posts: FeedPost[]; nextBefore: string | null };
+
+export type FriendItem = UserBrief & { match: number | null; online: boolean };
+
+export type FriendRequest = {
+  requestId: string;
+  createdAt: string;
+  user: UserBrief;
+  match: number | null;
+  mutualFriends: number;
+};
+
+export type SimilarPerson = {
+  user: UserBrief;
+  match: number;
+  friendStatus: FriendStatus;
+  requestId: string | null;
+};
+
+export type PublicProfile = UserBrief & {
+  bio: string | null;
+  city: string | null;
+  online: boolean;
+  relation: { status: FriendStatus; requestId: string | null };
+  mutualFriends: number;
+  stats: { friendCount: number; scanCount: number; reviewCount: number; postCount: number };
+  taste: { percent: number; note: string } | null;
+};
+
+export type UserBarItem = {
+  beer: { id: string; name: string; style: string; imageUrl: string | null; brewery: { id: string; name: string } };
+  rating: number | null;
+  scannedAt: string;
 };
 
 export type UserProfile = {
@@ -73,6 +142,8 @@ export type UserProfile = {
   name: string;
   avatarUrl: string | null;
   bio: string | null;
+  username: string | null;
+  city: string | null;
   createdAt: string;
   stats: { scanCount: number; reviewCount: number };
 };

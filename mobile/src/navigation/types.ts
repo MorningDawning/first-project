@@ -13,6 +13,10 @@ export type HomeStackParamList = {
 
 export type FeedStackParamList = {
   FeedHome: undefined;
+  PostDetail: { postId: string };
+  Compose: { beerId?: string } | undefined;
+  UserProfile: { userId: string };
+  FriendRequests: undefined;
   BeerDetail: { beerId: string };
 };
 

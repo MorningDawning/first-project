@@ -1,34 +1,51 @@
 import React, { useCallback, useState } from "react";
-import { FlatList, Image, RefreshControl, StyleSheet, Text, View } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
-import { TextField } from "../../components/TextField";
-import { Button } from "../../components/Button";
+import { Avatar } from "../../components/Avatar";
+import { FriendActionButton } from "../../components/FriendActionButton";
+import { MatchRing } from "../../components/MatchRing";
+import { PostCard } from "../../components/PostCard";
+import { Icon } from "../../components/icons/Icon";
 import { EmptyView, ErrorView, LoadingView } from "../../components/StateViews";
-import { feedApi } from "../../api/beervia";
+import { feedApi, friendsApi, postsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
-import { colors, radius, spacing, typography } from "../../theme/colors";
-import { FriendPost } from "../../types";
+import { plural } from "../../lib/time";
+import { colors, fonts, radius, spacing } from "../../theme/colors";
+import { FeedStackParamList } from "../../navigation/types";
+import { FeedPost, FriendRequest, FriendStatus, SimilarPerson } from "../../types";
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
-}
+type Nav = NativeStackNavigationProp<FeedStackParamList, "FeedHome">;
+type Tab = "friends" | "foryou";
 
 export function FeedScreen() {
-  const [posts, setPosts] = useState<FriendPost[]>([]);
+  const navigation = useNavigation<Nav>();
+  const [tab, setTab] = useState<Tab>("friends");
+  const [friendsPosts, setFriendsPosts] = useState<FeedPost[]>([]);
+  const [nextBefore, setNextBefore] = useState<string | null>(null);
+  const [forYouPosts, setForYouPosts] = useState<FeedPost[]>([]);
+  const [people, setPeople] = useState<SimilarPerson[]>([]);
+  const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [text, setText] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [posting, setPosting] = useState(false);
-
-  const load = useCallback(async () => {
+  const refresh = useCallback(async () => {
     setError(null);
     try {
-      const data = await feedApi.list();
-      setPosts(data);
+      const [friends, forYou, similar, incoming] = await Promise.all([
+        feedApi.list("friends"),
+        feedApi.list("foryou"),
+        feedApi.people(),
+        friendsApi.requests(),
+      ]);
+      setFriendsPosts(friends.posts);
+      setNextBefore(friends.nextBefore);
+      setForYouPosts(forYou.posts);
+      setPeople(similar);
+      setRequests(incoming);
     } catch (e) {
       setError(apiErrorMessage(e, "Не удалось загрузить ленту"));
     } finally {
@@ -39,87 +56,203 @@ export function FeedScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load])
+      refresh();
+    }, [refresh])
   );
 
-  async function handlePost() {
-    if (!text.trim()) return;
-    setPosting(true);
+  async function loadMore() {
+    if (tab !== "friends" || !nextBefore || loadingMore) return;
+    setLoadingMore(true);
     try {
-      await feedApi.create(text.trim(), imageUrl.trim() || undefined);
-      setText("");
-      setImageUrl("");
-      await load();
-    } catch (e) {
-      setError(apiErrorMessage(e, "Не удалось опубликовать пост"));
+      const page = await feedApi.list("friends", nextBefore);
+      setFriendsPosts((prev) => [...prev, ...page.posts]);
+      setNextBefore(page.nextBefore);
+    } catch {
+      // следующая попытка — при новом скролле
     } finally {
-      setPosting(false);
+      setLoadingMore(false);
     }
   }
 
-  const header = (
-    <View style={styles.composer}>
-      <Text style={styles.title}>Лента</Text>
-      <TextField label="Поделитесь находкой" value={text} onChangeText={setText} multiline placeholder="Что попробовали сегодня?" />
-      <TextField label="Ссылка на фото (необязательно)" value={imageUrl} onChangeText={setImageUrl} placeholder="https://…" autoCapitalize="none" />
-      <Button title="Опубликовать" onPress={handlePost} loading={posting} disabled={!text.trim()} />
-    </View>
-  );
+  function patchPost(id: string, patch: Partial<FeedPost>) {
+    const apply = (list: FeedPost[]) => list.map((p) => (p.id === id ? { ...p, ...patch } : p));
+    setFriendsPosts(apply);
+    setForYouPosts(apply);
+  }
 
-  if (loading) return <LoadingView label="Загружаем ленту…" />;
+  async function toggleLike(post: FeedPost) {
+    const liked = !post.likedByMe;
+    patchPost(post.id, { likedByMe: liked, likeCount: post.likeCount + (liked ? 1 : -1) });
+    try {
+      patchPost(post.id, liked ? await postsApi.like(post.id) : await postsApi.unlike(post.id));
+    } catch {
+      patchPost(post.id, { likedByMe: post.likedByMe, likeCount: post.likeCount });
+    }
+  }
+
+  function onFriendChanged(userId: string, status: FriendStatus) {
+    setForYouPosts((list) =>
+      list.map((p) => (p.user.id === userId && p.author ? { ...p, author: { ...p.author, friendStatus: status } } : p))
+    );
+    setPeople((list) => list.map((x) => (x.user.id === userId ? { ...x, friendStatus: status } : x)));
+  }
+
+  const posts = tab === "friends" ? friendsPosts : forYouPosts;
+
+  const requestsBanner =
+    requests.length > 0 ? (
+      <Pressable onPress={() => navigation.navigate("FriendRequests")} style={styles.banner}>
+        <View style={styles.bannerAvatars}>
+          {requests.slice(0, 2).map((r, i) => (
+            <View key={r.requestId} style={[styles.bannerAvatar, i > 0 && { marginLeft: -10 }]}>
+              <Avatar user={r.user} size={34} />
+            </View>
+          ))}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.bannerTitle}>
+            {requests.length} {plural(requests.length, "заявка", "заявки", "заявок")} в друзья
+          </Text>
+          <Text style={styles.bannerSub} numberOfLines={1}>
+            {requests
+              .slice(0, 2)
+              .map((r) => r.user.name.split(" ")[0])
+              .join(" и ")}{" "}
+            {requests.length === 1 ? "хочет" : "хотят"} дружить
+          </Text>
+        </View>
+        <Icon name="chevronRight" color="#3D472B" size={18} strokeWidth={2.75} />
+      </Pressable>
+    ) : null;
+
+  const peopleRow =
+    people.length > 0 ? (
+      <View>
+        <Text style={styles.sectionTitle}>Похожий вкус</Text>
+        <FlatList
+          horizontal
+          data={people}
+          keyExtractor={(x) => x.user.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.peopleList}
+          style={styles.peopleRow}
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => navigation.navigate("UserProfile", { userId: item.user.id })}
+              style={styles.personCard}
+            >
+              <MatchRing percent={item.match} size={64} strokeWidth={4} trackColor={colors.border}>
+                <Avatar user={item.user} size={50} />
+              </MatchRing>
+              <View style={styles.personText}>
+                <Text style={styles.personName} numberOfLines={1}>{item.user.name.split(" ")[0]}</Text>
+                <Text style={styles.personMatch}>вкус · {item.match}%</Text>
+              </View>
+              <FriendActionButton
+                userId={item.user.id}
+                status={item.friendStatus}
+                variant="small"
+                onChanged={(s) => onFriendChanged(item.user.id, s)}
+              />
+            </Pressable>
+          )}
+        />
+        {posts.length > 0 && <View style={{ height: spacing.md }} />}
+      </View>
+    ) : null;
 
   return (
     <Screen>
-      <FlatList
-        ListHeaderComponent={header}
-        data={posts}
-        keyExtractor={(p) => p.id}
-        contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-        ListEmptyComponent={error ? <ErrorView message={error} onRetry={load} /> : <EmptyView emoji="📸" message="Пока нет постов — станьте первым!" />}
-        renderItem={({ item }) => (
-          <View style={styles.post}>
-            <View style={styles.postHeader}>
-              {item.user.avatarUrl ? (
-                <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Text style={styles.avatarInitial}>{item.user.name[0]?.toUpperCase()}</Text>
-                </View>
-              )}
-              <View>
-                <Text style={styles.postUser}>{item.user.name}</Text>
-                <Text style={styles.postDate}>{formatDate(item.createdAt)}</Text>
-              </View>
+      <View style={styles.header}>
+        <Text style={styles.title}>Лента</Text>
+        <Pressable onPress={() => navigation.navigate("Compose")} style={styles.plusBtn} hitSlop={6}>
+          <Icon name="plus" color={colors.background} size={22} strokeWidth={2.75} />
+        </Pressable>
+      </View>
+
+      <View style={styles.segmented}>
+        {([["friends", "Друзья"], ["foryou", "Для тебя"]] as const).map(([key, label]) => (
+          <Pressable key={key} onPress={() => setTab(key)} style={[styles.segment, tab === key && styles.segmentActive]}>
+            <Text style={[styles.segmentText, tab === key && styles.segmentTextActive]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {loading ? (
+        <LoadingView label="Загружаем ленту…" />
+      ) : error && posts.length === 0 ? (
+        <ErrorView message={error} onRetry={refresh} />
+      ) : (
+        <FlatList
+          data={posts}
+          keyExtractor={(p) => p.id}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          ListHeaderComponent={
+            <View>
+              {tab === "friends" ? requestsBanner : peopleRow}
             </View>
-            <Text style={styles.postText}>{item.text}</Text>
-            {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.postImage} />}
-          </View>
-        )}
-      />
+          }
+          ListEmptyComponent={
+            tab === "friends" ? (
+              <EmptyView emoji="🍻" message="Пока тихо. Добавь друзей во вкладке «Для тебя» или напиши первый пост" />
+            ) : people.length === 0 ? (
+              <EmptyView emoji="🔍" message="Пока нечего показать — оцени несколько сортов, и мы найдём людей с похожим вкусом" />
+            ) : null
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); refresh(); }} tintColor={colors.primary} />
+          }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          renderItem={({ item }) => (
+            <PostCard
+              post={item}
+              onPress={() => navigation.navigate("PostDetail", { postId: item.id })}
+              onLike={() => toggleLike(item)}
+              onOpenUser={() => navigation.navigate("UserProfile", { userId: item.user.id })}
+              onOpenBeer={(beerId) => navigation.navigate("BeerDetail", { beerId })}
+              onFriendChanged={onFriendChanged}
+            />
+          )}
+        />
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  composer: { paddingTop: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
-  title: { ...typography.title, marginBottom: spacing.xs },
-  post: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, paddingTop: 10 },
+  title: { fontFamily: fonts.display, fontSize: 30, color: colors.text },
+  plusBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+
+  segmented: {
+    flexDirection: "row",
+    marginHorizontal: spacing.lg,
+    marginTop: 14,
+    marginBottom: 12,
+    backgroundColor: colors.border,
+    borderRadius: radius.pill,
+    padding: 4,
   },
-  postHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
-  avatar: { width: 36, height: 36, borderRadius: 18 },
-  avatarPlaceholder: { backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  avatarInitial: { color: "#fff", fontWeight: "700" },
-  postUser: { fontWeight: "700", color: colors.text },
-  postDate: { ...typography.caption },
-  postText: { ...typography.body, marginBottom: spacing.sm },
-  postImage: { width: "100%", height: 180, borderRadius: radius.sm },
+  segment: { flex: 1, paddingVertical: 9, alignItems: "center", borderRadius: radius.pill },
+  segmentActive: { backgroundColor: colors.card },
+  segmentText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: "#474238" },
+  segmentTextActive: { fontFamily: fonts.bodyBold, color: colors.text },
+
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+
+  banner: { backgroundColor: "#E1EECC", borderRadius: 24, padding: 12, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  bannerAvatars: { flexDirection: "row" },
+  bannerAvatar: { borderRadius: 20, borderWidth: 3, borderColor: "#E1EECC" },
+  bannerTitle: { fontFamily: fonts.bodyBold, fontSize: 15, color: "#272E1B" },
+  bannerSub: { fontFamily: fonts.body, fontSize: 13, color: "#3D472B" },
+
+  sectionTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.text, marginBottom: 10 },
+  peopleRow: { flexGrow: 0, marginHorizontal: -spacing.lg },
+  peopleList: { paddingHorizontal: spacing.lg, gap: 10 },
+  personCard: { width: 128, backgroundColor: colors.card, borderRadius: 26, paddingTop: 14, paddingHorizontal: 10, paddingBottom: 10, alignItems: "center", gap: 8 },
+  personText: { alignItems: "center" },
+  personName: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.text },
+  personMatch: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.success },
 });

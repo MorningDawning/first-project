@@ -8,6 +8,7 @@ import { BarNavigator } from "./BarNavigator";
 import { ProfileNavigator } from "./ProfileNavigator";
 import { CameraScanScreen } from "../screens/scan/CameraScanScreen";
 import { BarIcon, CameraIcon, FeedIcon, HomeIcon, IconProps, ProfileIcon } from "../components/icons/TabIcons";
+import { TAB_BAR_STYLE } from "./tabBarStyle";
 import { colors, fonts } from "../theme/colors";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -38,7 +39,7 @@ export function MainTabNavigator({ initialRouteName }: Props) {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: TAB_BAR_STYLE,
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarLabel: LABELS[route.name as RegularTabName],
         tabBarIcon: ({ color }) => {
@@ -68,12 +69,6 @@ export function MainTabNavigator({ initialRouteName }: Props) {
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    height: 88,
-    paddingTop: 10,
-    backgroundColor: colors.card,
-    borderTopColor: colors.border,
-  },
   tabBarLabel: { fontFamily: fonts.bodySemiBold, fontSize: 11 },
   cameraBadge: {
     width: 62,

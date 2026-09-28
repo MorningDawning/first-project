@@ -3,6 +3,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
+import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { Icon } from "../components/icons/Icon";
+import { MainTabParamList } from "../navigation/types";
 import { Screen } from "../components/Screen";
 import { LoadingView, ErrorView } from "../components/StateViews";
 import { MatchRing } from "../components/MatchRing";
@@ -65,6 +68,12 @@ export function BeerDetailScreen() {
 
   const myReview = useMemo(() => beer?.reviews.find((r) => r.user.id === user?.id) ?? null, [beer, user?.id]);
 
+  function shareToFeed() {
+    navigation
+      .getParent<BottomTabNavigationProp<MainTabParamList>>()
+      ?.navigate("FeedTab", { screen: "Compose", params: { beerId } });
+  }
+
   async function toggleWishlist() {
     if (!beer || wishlistBusy) return;
     setWishlistBusy(true);
@@ -121,9 +130,14 @@ export function BeerDetailScreen() {
           <Pressable onPress={() => navigation.goBack()} style={styles.roundBtn} hitSlop={8}>
             <Text style={styles.roundBtnIcon}>←</Text>
           </Pressable>
-          <Pressable onPress={toggleWishlist} style={styles.roundBtn} hitSlop={8}>
-            <Text style={styles.roundBtnIcon}>{beer.isWishlisted ? "♥" : "♡"}</Text>
-          </Pressable>
+          <View style={styles.topRight}>
+            <Pressable onPress={shareToFeed} style={styles.roundBtn} hitSlop={8}>
+              <Icon name="send" color={colors.text} size={20} />
+            </Pressable>
+            <Pressable onPress={toggleWishlist} style={styles.roundBtn} hitSlop={8}>
+              <Text style={styles.roundBtnIcon}>{beer.isWishlisted ? "♥" : "♡"}</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.headerRow}>
@@ -282,6 +296,7 @@ const styles = StyleSheet.create({
   },
 
   topRow: { flexDirection: "row", justifyContent: "space-between" },
+  topRight: { flexDirection: "row", gap: 8 },
   roundBtn: {
     width: 44,
     height: 44,
