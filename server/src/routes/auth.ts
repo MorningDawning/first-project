@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { comparePassword, hashPassword, signToken } from "../lib/auth";
+import { usernameFromEmail } from "../lib/social";
 
 export const authRouter = Router();
 
@@ -25,7 +26,7 @@ authRouter.post("/register", async (req, res) => {
 
   const passwordHash = await hashPassword(password);
   const user = await prisma.user.create({
-    data: { email, passwordHash, name },
+    data: { email, passwordHash, name, username: await usernameFromEmail(email) },
   });
 
   const token = signToken(user.id);

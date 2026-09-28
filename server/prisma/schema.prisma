@@ -8,28 +8,37 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   name         String
   avatarUrl    String?
   bio          String?
-  createdAt    DateTime @default(now())
+  username     String?   @unique // @handle, генерируется при регистрации, можно сменить в настройках
+  city         String?
+  lastSeenAt   DateTime? // «в сети» = активность за последние пару минут
+  createdAt    DateTime  @default(now())
 
   // Вкусовые предпочтения из онбординг-квиза (0-100), заполняются до первого
   // скана или отзыва — см. computeUserTasteProfile в lib/taste.ts.
-  prefSweetness Int?
+  prefSweetness  Int?
   prefBitterness Int?
-  prefSourness  Int?
-  prefBody      Int?
-  prefAroma     Int?
+  prefSourness   Int?
+  prefBody       Int?
+  prefAroma      Int?
 
-  reviews       Review[]
-  scans         ScanHistory[]
-  posts         FriendPost[]
-  wishlist      Wishlist[]
-  friendsFrom   Friendship[]  @relation("FriendshipFrom")
-  friendsTo     Friendship[]  @relation("FriendshipTo")
+  reviews          Review[]
+  scans            ScanHistory[]
+  posts            Post[]
+  postLikes        PostLike[]
+  comments         Comment[]
+  commentLikes     CommentLike[]
+  wishlist         Wishlist[]
+  friendsFrom      Friendship[]  @relation("FriendshipFrom")
+  friendsTo        Friendship[]  @relation("FriendshipTo")
+  sentMessages     Message[]     @relation("MessageSender")
+  receivedMessages Message[]     @relation("MessageRecipient")
+  reports          Report[]
 }
 
 model Brewery {
@@ -55,11 +64,11 @@ model Beer {
   barcode     String? @unique
 
   // taste profile axes, 0-100
-  sweetness   Int
-  bitterness  Int
-  sourness    Int
-  body        Int
-  aroma       Int
+  sweetness  Int
+  bitterness Int
+  sourness   Int
+  body       Int
+  aroma      Int
 
   foodPairings String // JSON-encoded string array
 
@@ -67,6 +76,8 @@ model Beer {
   reviews  Review[]
   scans    ScanHistory[]
   wishlist Wishlist[]
+  posts    Post[]
+  messages Message[]
 }
 
 model Review {
@@ -106,14 +117,91 @@ model ScanHistory {
   beer Beer @relation(fields: [beerId], references: [id])
 }
 
-model FriendPost {
-  id        String   @id @default(cuid())
+model Post {
+  id         String   @id @default(cuid())
+  userId     String
+  text       String
+  beerId     String?
+  rating     Int? // оценка пива из поста (1-5), при публикации превращается в отзыв
+  place      String?
+  visibility String   @default("friends") // "friends" | "all"
+  photos     String   @default("[]") // JSON-массив ссылок на загруженные фото
+  createdAt  DateTime @default(now())
+
+  user     User       @relation(fields: [userId], references: [id])
+  beer     Beer?      @relation(fields: [beerId], references: [id])
+  likes    PostLike[]
+  comments Comment[]
+
+  @@index([createdAt])
+  @@map("FriendPost")
+}
+
+model PostLike {
+  postId    String
   userId    String
-  text      String
-  imageUrl  String?
   createdAt DateTime @default(now())
 
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id])
+
+  @@id([postId, userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  parentId  String? // один уровень вложенности: ответ всегда привязан к корневому комментарию
+  text      String
+  createdAt DateTime @default(now())
+
+  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id])
+  parent  Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[]     @relation("CommentReplies")
+  likes   CommentLike[]
+
+  @@index([postId, createdAt])
+}
+
+model CommentLike {
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@id([commentId, userId])
+}
+
+model Message {
+  id          String    @id @default(cuid())
+  senderId    String
+  recipientId String
+  text        String?
+  beerId      String? // сообщение-карточка с пивом
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
+
+  sender    User  @relation("MessageSender", fields: [senderId], references: [id])
+  recipient User  @relation("MessageRecipient", fields: [recipientId], references: [id])
+  beer      Beer? @relation(fields: [beerId], references: [id])
+
+  @@index([recipientId, readAt])
+  @@index([senderId, recipientId, createdAt])
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  targetType String // "user" | "post" | "comment" | "message"
+  targetId   String
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id])
 }
 
 model Friendship {
@@ -127,4 +215,5 @@ model Friendship {
   friend User @relation("FriendshipTo", fields: [friendId], references: [id])
 
   @@unique([userId, friendId])
+  @@index([friendId, status])
 }

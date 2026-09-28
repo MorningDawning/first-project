@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
+    "seed:social": "tsx prisma/seedSocial.ts",
     "sync-photos": "tsx src/scripts/syncBeerPhotos.ts"
   },
   "prisma": {

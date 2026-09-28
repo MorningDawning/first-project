@@ -1,12 +1,19 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { seedCommunity } from "./community";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Очистка базы...");
-  await prisma.friendPost.deleteMany();
+  await prisma.report.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.commentLike.deleteMany();
+  await prisma.comment.deleteMany();
+  await prisma.postLike.deleteMany();
+  await prisma.post.deleteMany();
   await prisma.friendship.deleteMany();
+  await prisma.wishlist.deleteMany();
   await prisma.scanHistory.deleteMany();
   await prisma.review.deleteMany();
   await prisma.beer.deleteMany();
@@ -159,46 +166,47 @@ async function main() {
 
   console.log("Пользователи...");
   const passwordHash = await bcrypt.hash("demo1234", 10);
-  const [demo, anna, igor, maria] = await Promise.all([
-    prisma.user.create({ data: { email: "demo@beervia.app", passwordHash, name: "Демо Пользователь", bio: "Люблю хмелевые сорта и всё, что с ароматом тропических фруктов." } }),
-    prisma.user.create({ data: { email: "anna@beervia.app", passwordHash, name: "Анна Крафт", avatarUrl: "https://i.pravatar.cc/150?img=47" } }),
-    prisma.user.create({ data: { email: "igor@beervia.app", passwordHash, name: "Игорь Хмель", avatarUrl: "https://i.pravatar.cc/150?img=12" } }),
-    prisma.user.create({ data: { email: "maria@beervia.app", passwordHash, name: "Мария Солод", avatarUrl: "https://i.pravatar.cc/150?img=32" } }),
-  ]);
+  const demo = await prisma.user.create({
+    data: {
+      email: "demo@beervia.app",
+      passwordHash,
+      name: "Демо Пользователь",
+      username: "demo",
+      city: "Москва",
+      bio: "Люблю хмелевые сорта и всё, что с ароматом тропических фруктов.",
+    },
+  });
 
   const byName = (name: string) => beers.find((b) => b.name === name)!;
 
-  console.log("Отзывы...");
+  console.log("Отзывы демо-пользователя...");
+  const R = (beer: string, rating: number, text?: string) =>
+    prisma.review.create({ data: { beerId: byName(beer).id, userId: demo.id, rating, text } });
+  // taste signal — leans hoppy & aromatic
   await Promise.all([
-    prisma.review.create({ data: { beerId: byName("Punk IPA").id, userId: anna.id, rating: 5, text: "Обожаю эту горечь, идеально с острыми крылышками!" } }),
-    prisma.review.create({ data: { beerId: byName("Punk IPA").id, userId: igor.id, rating: 4, text: "Классика, всегда беру на вечеринки." } }),
-    prisma.review.create({ data: { beerId: byName("Hazy Jane").id, userId: maria.id, rating: 5, text: "Ароматика просто космос, как сок манго." } }),
-    prisma.review.create({ data: { beerId: byName("Draught").id, userId: anna.id, rating: 4, text: "Идеальный баланс, пьётся легко." } }),
-    prisma.review.create({ data: { beerId: byName("Draught").id, userId: igor.id, rating: 5 } }),
-    prisma.review.create({ data: { beerId: byName("Hefeweissbier").id, userId: maria.id, rating: 4, text: "Отличное летнее пиво." } }),
-    prisma.review.create({ data: { beerId: byName("Duvel").id, userId: anna.id, rating: 5, text: "Обманчиво лёгкое, будьте осторожны." } }),
-    prisma.review.create({ data: { beerId: byName("Rosé Lambic").id, userId: maria.id, rating: 5, text: "Кислинка восхитительна с летними ягодами." } }),
-    prisma.review.create({ data: { beerId: byName("Imperial Stout").id, userId: igor.id, rating: 4, text: "Тяжёлое, но очень насыщенное." } }),
-    // demo user's own taste signal — leans hoppy & aromatic
-    prisma.review.create({ data: { beerId: byName("Punk IPA").id, userId: demo.id, rating: 5, text: "Мой любимый стиль — яркий хмель и цитрус." } }),
-    prisma.review.create({ data: { beerId: byName("Hazy Jane").id, userId: demo.id, rating: 5, text: "Топовая ароматика, беру снова и снова." } }),
-    prisma.review.create({ data: { beerId: byName("Tripel Hop").id, userId: demo.id, rating: 4 } }),
-    prisma.review.create({ data: { beerId: byName("Super Dry").id, userId: demo.id, rating: 2, text: "Слишком просто для моего вкуса." } }),
+    R("Punk IPA", 5, "Мой любимый стиль — яркий хмель и цитрус."),
+    R("Hazy Jane", 5, "Топовая ароматика, беру снова и снова."),
+    R("Tripel Hop", 4),
+    R("Super Dry", 2, "Слишком просто для моего вкуса."),
   ]);
 
   console.log("История сканирований...");
-  const demoScans = ["Punk IPA", "Hazy Jane", "Pale Ale", "Tripel Hop", "Super Dry", "Draught"];
-  for (const name of demoScans) {
+  for (const name of ["Punk IPA", "Hazy Jane", "Pale Ale", "Tripel Hop", "Super Dry", "Draught"]) {
     await prisma.scanHistory.create({ data: { userId: demo.id, beerId: byName(name).id } });
   }
 
-  console.log("Лента друзей...");
-  await Promise.all([
-    prisma.friendPost.create({ data: { userId: anna.id, text: "Сегодня открыла для себя Rosé Lambic от Duvel — настоящий летний хит! 🍓" } }),
-    prisma.friendPost.create({ data: { userId: igor.id, text: "Дегустация балтийских портеров в баре на набережной. Балтийский Портер от Северного ветра — топ." } }),
-    prisma.friendPost.create({ data: { userId: maria.id, text: "Кто-нибудь пробовал Hazy Jane? Хочу с чем-то сравнить." } }),
-    prisma.friendPost.create({ data: { userId: anna.id, text: "Собрала вертикальную дегустацию стаутов Guinness — разница между Draught и Foreign Extra огромная." } }),
-  ]);
+  console.log("Сообщество (друзья, посты, комментарии, сообщения)...");
+  await seedCommunity(prisma, [demo]);
+  await prisma.post.create({
+    data: {
+      userId: demo.id,
+      text: "Punk IPA снова не подвёл: цитрус, горчинка, всё как я люблю.",
+      beerId: byName("Punk IPA").id,
+      rating: 5,
+      place: "Дома",
+      createdAt: new Date(Date.now() - 30 * 3_600_000),
+    },
+  });
 
   console.log("Готово ✅");
 }

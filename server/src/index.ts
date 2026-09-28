@@ -11,6 +11,10 @@ import { breweriesRouter } from "./routes/breweries";
 import { tasteProfileRouter } from "./routes/tasteProfile";
 import { feedRouter } from "./routes/feed";
 import { wishlistRouter } from "./routes/wishlist";
+import { friendsRouter } from "./routes/friends";
+import { postsRouter, commentsRouter } from "./routes/posts";
+import { profilesRouter } from "./routes/profiles";
+import { UPLOADS_DIR, uploadsRouter } from "./routes/uploads";
 
 // Express 4 doesn't forward a rejected promise from an async route handler
 // to error middleware on its own, and Node kills the whole process on an
@@ -33,6 +37,9 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 // mobile/src/api/config.ts resolveMediaUrl) — так же, как уже делает для API_URL.
 app.use("/beer-photos", express.static(path.join(__dirname, "..", "..", "ml", "dataset")));
 
+// Фото из постов. nosniff — чтобы браузер не пытался «угадать» иной тип файла.
+app.use("/uploads", express.static(UPLOADS_DIR, { setHeaders: (res) => res.setHeader("X-Content-Type-Options", "nosniff") }));
+
 app.use("/auth", authRouter);
 app.use("/", usersRouter);
 app.use("/beers", beersRouter);
@@ -42,6 +49,11 @@ app.use("/breweries", breweriesRouter);
 app.use("/taste-profile", tasteProfileRouter);
 app.use("/feed", feedRouter);
 app.use("/wishlist", wishlistRouter);
+app.use("/friends", friendsRouter);
+app.use("/posts", postsRouter);
+app.use("/comments", commentsRouter);
+app.use("/users", profilesRouter);
+app.use("/uploads", uploadsRouter);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
