@@ -13,19 +13,24 @@ import { colors } from "./src/theme/colors";
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Caprasimo_400Regular,
     Figtree_400Regular,
     Figtree_500Medium,
     Figtree_600SemiBold,
     Figtree_700Bold,
   });
+  // useFonts возвращает [loaded, error] — раньше мы читали только loaded,
+  // и при ошибке загрузки шрифтов (а не просто "ещё грузится") приложение
+  // навсегда зависало на пустом экране без единого намёка на причину.
+  const ready = fontsLoaded || !!fontError;
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
-  }, [fontsLoaded]);
+    if (fontError) console.error("Не удалось загрузить шрифты:", fontError);
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready, fontError]);
 
-  if (!fontsLoaded) return null;
+  if (!ready) return null;
 
   return (
     <SafeAreaProvider>
