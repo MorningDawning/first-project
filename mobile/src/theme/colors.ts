@@ -27,13 +27,19 @@ export const radius = {
   pill: 999,
 };
 
-/** Caprasimo (rounded display serif) for headlines, Figtree for everything else. */
+/**
+ * Caprasimo и Figtree из макета не содержат кириллицы — русский текст в них
+ * молча заменялся системным шрифтом. В самом макете для кириллицы стоят запасные
+ * гарнитуры Rubik (заголовки) и Manrope (текст), их и берём напрямую;
+ * Caprasimo оставлен только для латинского логотипа.
+ */
 export const fonts = {
-  display: "Caprasimo_400Regular",
-  body: "Figtree_400Regular",
-  bodyMedium: "Figtree_500Medium",
-  bodySemiBold: "Figtree_600SemiBold",
-  bodyBold: "Figtree_700Bold",
+  brand: "Caprasimo_400Regular",
+  display: "Rubik_500Medium",
+  body: "Manrope_400Regular",
+  bodyMedium: "Manrope_500Medium",
+  bodySemiBold: "Manrope_600SemiBold",
+  bodyBold: "Manrope_700Bold",
 };
 
 export const typography = {

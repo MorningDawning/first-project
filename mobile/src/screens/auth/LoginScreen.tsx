@@ -6,7 +6,7 @@ import { TextField } from "../../components/TextField";
 import { Button } from "../../components/Button";
 import { useAuth } from "../../context/AuthContext";
 import { apiErrorMessage } from "../../api/client";
-import { colors, spacing, typography } from "../../theme/colors";
+import { colors, fonts, spacing, typography } from "../../theme/colors";
 import { AuthStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
@@ -69,7 +69,7 @@ export function LoginScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: spacing.lg, justifyContent: "center" },
-  logo: { ...typography.title, fontSize: 32, textAlign: "center", marginBottom: spacing.xs },
+  logo: { ...typography.title, fontFamily: fonts.brand, fontSize: 32, textAlign: "center", marginBottom: spacing.xs },
   subtitle: { ...typography.caption, textAlign: "center", marginBottom: spacing.xl },
   form: { marginTop: spacing.md },
   error: { color: colors.danger, marginBottom: spacing.sm, textAlign: "center" },
