@@ -14,6 +14,7 @@ import { wishlistRouter } from "./routes/wishlist";
 import { friendsRouter } from "./routes/friends";
 import { postsRouter, commentsRouter } from "./routes/posts";
 import { profilesRouter } from "./routes/profiles";
+import { messagesRouter } from "./routes/messages";
 import { UPLOADS_DIR, uploadsRouter } from "./routes/uploads";
 
 // Express 4 doesn't forward a rejected promise from an async route handler
@@ -53,6 +54,7 @@ app.use("/friends", friendsRouter);
 app.use("/posts", postsRouter);
 app.use("/comments", commentsRouter);
 app.use("/users", profilesRouter);
+app.use("/messages", messagesRouter);
 app.use("/uploads", uploadsRouter);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

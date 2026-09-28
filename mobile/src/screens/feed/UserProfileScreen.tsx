@@ -152,10 +152,20 @@ export function UserProfileScreen({ route, navigation }: Props) {
               <View style={{ flex: 1 }}>
                 <FriendActionButton userId={profile.id} status={status} variant="large" onChanged={onRelationChanged} />
               </View>
-              <View style={[styles.writeBtn, styles.writeLocked]}>
-                <Icon name="lock" color="#82796A" size={16} />
-                <Text style={styles.writeText}>Написать</Text>
-              </View>
+              {status === "friends" ? (
+                <Pressable
+                  onPress={() => navigation.navigate("Chat", { userId: profile.id })}
+                  style={[styles.writeBtn, styles.writeOpen]}
+                >
+                  <Icon name="send" color={colors.text} size={16} />
+                  <Text style={[styles.writeText, { color: colors.text }]}>Написать</Text>
+                </Pressable>
+              ) : (
+                <View style={[styles.writeBtn, styles.writeLocked]}>
+                  <Icon name="lock" color="#82796A" size={16} />
+                  <Text style={styles.writeText}>Написать</Text>
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -236,6 +246,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", gap: 8 },
   writeBtn: { height: 50, paddingHorizontal: 20, borderRadius: radius.pill, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   writeLocked: { borderWidth: 2, borderColor: colors.border },
+  writeOpen: { backgroundColor: colors.card },
   writeText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: "#82796A" },
 
   tasteCard: { marginHorizontal: spacing.lg, marginTop: spacing.md, backgroundColor: "#E1EECC", borderRadius: 26, padding: 14, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 14 },

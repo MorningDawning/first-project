@@ -52,7 +52,15 @@ export function FriendActionButton({ userId, status, onChanged, variant = "large
   }
 
   const label =
-    status === "none" ? "В друзья" : status === "incoming" ? "Принять" : status === "outgoing" ? "Заявка отправлена" : "Друзья";
+    status === "none"
+      ? "В друзья"
+      : status === "incoming"
+        ? "Принять"
+        : status === "outgoing"
+          ? variant === "large"
+            ? "Заявка отправлена"
+            : "Отправлено"
+          : "Друзья";
   const filled = status === "none" || status === "incoming";
   const large = variant === "large";
 
@@ -89,6 +97,9 @@ export function FriendActionButton({ userId, status, onChanged, variant = "large
           {large && filled && <Icon name="userPlus" color={fg} size={18} strokeWidth={2.75} />}
           {status === "friends" && <Icon name="check" color={fg} size={large ? 16 : 13} strokeWidth={3} />}
           <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
             style={[
               large ? (filled ? styles.largeFilledText : styles.largeText) : styles.smallText,
               { color: fg },
@@ -105,7 +116,7 @@ export function FriendActionButton({ userId, status, onChanged, variant = "large
 const styles = StyleSheet.create({
   base: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: radius.pill },
   large: { height: 50, paddingHorizontal: 20 },
-  small: { height: 34, paddingHorizontal: 14, alignSelf: "stretch" },
+  small: { height: 34, paddingHorizontal: 10, alignSelf: "stretch" },
   outlined: { borderWidth: 2, borderColor: colors.text },
   largeFilledText: { fontFamily: fonts.display, fontSize: 16 },
   largeText: { fontFamily: fonts.bodySemiBold, fontSize: 14 },

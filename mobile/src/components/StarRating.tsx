@@ -6,9 +6,10 @@ type Props = {
   rating: number;
   onChange?: (rating: number) => void;
   size?: number;
+  emptyColor?: string;
 };
 
-export function StarRating({ rating, onChange, size = 18 }: Props) {
+export function StarRating({ rating, onChange, size = 18, emptyColor = colors.border }: Props) {
   const stars = [1, 2, 3, 4, 5];
   return (
     <View style={styles.row}>
@@ -17,7 +18,7 @@ export function StarRating({ rating, onChange, size = 18 }: Props) {
         const Star = onChange ? Pressable : View;
         return (
           <Star key={star} onPress={onChange ? () => onChange(star) : undefined} hitSlop={6}>
-            <Text style={{ fontSize: size, color: filled ? colors.accent : colors.border }}>★</Text>
+            <Text style={{ fontSize: size, color: filled ? colors.accent : emptyColor }}>★</Text>
           </Star>
         );
       })}

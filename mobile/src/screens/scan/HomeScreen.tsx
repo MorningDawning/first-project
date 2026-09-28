@@ -15,6 +15,9 @@ import { BarEntry, BeerSummary } from "../../types";
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, "Home">;
 
+// Ряд стилей на Главной начинается с самых ходовых, остальные — за ними.
+const PREFERRED_STYLES = ["IPA", "Stout", "Sour", "Weizen", "Lager", "Porter"];
+
 export function HomeScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
@@ -24,7 +27,13 @@ export function HomeScreen() {
   const [styleChips, setStyleChips] = useState<string[]>([]);
 
   useEffect(() => {
-    beersApi.styles().then((list) => setStyleChips(list.slice(0, 8))).catch(() => {});
+    beersApi
+      .styles()
+      .then((list) => {
+        const first = PREFERRED_STYLES.filter((s) => list.includes(s));
+        setStyleChips([...first, ...list.filter((s) => !first.includes(s))].slice(0, 8));
+      })
+      .catch(() => {});
   }, []);
 
   useFocusEffect(

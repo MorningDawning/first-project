@@ -11,6 +11,8 @@ import { colors, spacing, typography } from "../../theme/colors";
 export function SettingsScreen() {
   const { user, logout, refreshUser } = useAuth();
   const [name, setName] = useState(user?.name ?? "");
+  const [username, setUsername] = useState(user?.username ?? "");
+  const [city, setCity] = useState(user?.city ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,18 @@ export function SettingsScreen() {
     setSaved(false);
     setSaving(true);
     try {
-      await userApi.updateMe({ name: name.trim(), bio: bio.trim() });
+      const handle = username.trim().replace(/^@/, "").toLowerCase();
+      if (handle && !/^[a-z0-9_.]{3,20}$/.test(handle)) {
+        setError("Имя пользователя: 3–20 символов, латиница, цифры, _ и точка");
+        setSaving(false);
+        return;
+      }
+      await userApi.updateMe({
+        name: name.trim(),
+        bio: bio.trim(),
+        city: city.trim(),
+        ...(handle && handle !== user?.username ? { username: handle } : {}),
+      });
       await refreshUser();
       setSaved(true);
     } catch (e) {
@@ -39,6 +52,8 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Профиль</Text>
           <TextField label="Имя" value={name} onChangeText={setName} />
+          <TextField label="Имя пользователя" value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="например, masha_hops" />
+          <TextField label="Город" value={city} onChangeText={setCity} placeholder="Москва" />
           <TextField label="О себе" value={bio} onChangeText={setBio} multiline placeholder="Расскажите о своих вкусах" />
           {error && <Text style={styles.error}>{error}</Text>}
           {saved && <Text style={styles.saved}>Сохранено ✓</Text>}

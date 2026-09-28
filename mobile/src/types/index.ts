@@ -136,6 +136,36 @@ export type UserBarItem = {
   scannedAt: string;
 };
 
+export type Conversation = {
+  user: UserBrief;
+  online: boolean;
+  unread: number;
+  lastMessage: { id: string; text: string | null; beerName: string | null; fromMe: boolean; createdAt: string };
+};
+
+export type ChatMessage = {
+  id: string;
+  text: string | null;
+  fromMe: boolean;
+  createdAt: string;
+  readAt: string | null;
+  beer: {
+    id: string;
+    name: string;
+    style: string;
+    abv: number;
+    imageUrl: string | null;
+    brewery: { id: string; name: string };
+    matchForRecipient: number | null;
+  } | null;
+};
+
+export type ChatThread = {
+  peer: UserBrief & { online: boolean; match: number | null };
+  canSend: boolean;
+  messages: ChatMessage[];
+};
+
 export type UserProfile = {
   id: string;
   email: string;

@@ -26,7 +26,6 @@ import { useAuth } from "../../context/AuthContext";
 import { beersApi, feedApi, uploadsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { resolveMediaUrl } from "../../api/config";
-import { useHideTabBar } from "../../navigation/useHideTabBar";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
 import { FeedStackParamList } from "../../navigation/types";
 
@@ -41,7 +40,6 @@ export function ComposeScreen() {
   const route = useRoute<RouteProp<FeedStackParamList, "Compose">>();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  useHideTabBar();
 
   const [text, setText] = useState("");
   const [beer, setBeer] = useState<PickedBeer | null>(null);
@@ -186,7 +184,7 @@ export function ComposeScreen() {
               </View>
               <View style={styles.ratingRow}>
                 <Text style={styles.ratingLabel}>Моя оценка</Text>
-                <StarRating rating={rating} onChange={setRating} size={26} />
+                <StarRating rating={rating} onChange={setRating} size={26} emptyColor="#B9AE9B" />
               </View>
               {rating > 0 && <Text style={styles.ratingHint}>Оценка сохранится и в твоих отзывах о пиве</Text>}
             </View>

@@ -1,6 +1,8 @@
 import { api } from "./client";
 import {
   BarEntry,
+  ChatThread,
+  Conversation,
   BeerDetail,
   BeerSummary,
   Brewery,
@@ -150,4 +152,12 @@ export const uploadsApi = {
       .post<{ url: string }>("/uploads", form, { headers: { "Content-Type": "multipart/form-data" } })
       .then((r) => r.data.url);
   },
+};
+
+export const messagesApi = {
+  conversations: () => api.get<Conversation[]>("/messages/conversations").then((r) => r.data),
+  unreadCount: () => api.get<{ count: number }>("/messages/unread-count").then((r) => r.data.count),
+  thread: (userId: string) => api.get<ChatThread>(`/messages/with/${userId}`).then((r) => r.data),
+  send: (userId: string, body: { text?: string; beerId?: string }) =>
+    api.post<{ id: string }>(`/messages/with/${userId}`, body).then((r) => r.data),
 };

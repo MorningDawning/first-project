@@ -43,8 +43,10 @@ beersRouter.get("/", requireAuth, async (req, res) => {
 });
 
 beersRouter.get("/styles", requireAuth, async (_req, res) => {
-  const beers = await prisma.beer.findMany({ select: { style: true }, distinct: ["style"] });
-  res.json(beers.map((b) => b.style).sort());
+  // Самые популярные стили первыми — так ряд чипов на Главной начинается с IPA, а не с алфавита.
+  const groups = await prisma.beer.groupBy({ by: ["style"], _count: { style: true } });
+  groups.sort((a, b) => b._count.style - a._count.style || a.style.localeCompare(b.style));
+  res.json(groups.map((g) => g.style));
 });
 
 beersRouter.get("/:id", requireAuth, async (req, res) => {

@@ -23,3 +23,37 @@ export function stars(rating: number): string {
   const r = Math.max(0, Math.min(5, Math.round(rating)));
   return "★".repeat(r) + "☆".repeat(5 - r);
 }
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+export function clock(iso: string): string {
+  const d = new Date(iso);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+/** Время последнего сообщения в списке диалогов: 19:44, вчера, пн, 24 сен. */
+export function dialogTime(iso: string): string {
+  const d = new Date(iso);
+  const days = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86_400_000);
+  if (days <= 0) return clock(iso);
+  if (days === 1) return "вчера";
+  if (days < 7) return d.toLocaleDateString("ru-RU", { weekday: "short" });
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }).replace(".", "");
+}
+
+/** Разделитель дней внутри чата. */
+export function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const days = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86_400_000);
+  if (days <= 0) return "Сегодня";
+  if (days === 1) return "Вчера";
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+}
+
+export function sameDay(a: string, b: string): boolean {
+  return startOfDay(new Date(a)) === startOfDay(new Date(b));
+}

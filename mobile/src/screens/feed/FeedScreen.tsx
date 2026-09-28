@@ -9,7 +9,7 @@ import { MatchRing } from "../../components/MatchRing";
 import { PostCard } from "../../components/PostCard";
 import { Icon } from "../../components/icons/Icon";
 import { EmptyView, ErrorView, LoadingView } from "../../components/StateViews";
-import { feedApi, friendsApi, postsApi } from "../../api/beervia";
+import { feedApi, friendsApi, messagesApi, postsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { plural } from "../../lib/time";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
@@ -31,16 +31,19 @@ export function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unread, setUnread] = useState(0);
 
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const [friends, forYou, similar, incoming] = await Promise.all([
+      const [friends, forYou, similar, incoming, unreadCount] = await Promise.all([
         feedApi.list("friends"),
         feedApi.list("foryou"),
         feedApi.people(),
         friendsApi.requests(),
+        messagesApi.unreadCount(),
       ]);
+      setUnread(unreadCount);
       setFriendsPosts(friends.posts);
       setNextBefore(friends.nextBefore);
       setForYouPosts(forYou.posts);
@@ -165,9 +168,19 @@ export function FeedScreen() {
     <Screen>
       <View style={styles.header}>
         <Text style={styles.title}>Лента</Text>
-        <Pressable onPress={() => navigation.navigate("Compose")} style={styles.plusBtn} hitSlop={6}>
-          <Icon name="plus" color={colors.background} size={22} strokeWidth={2.75} />
-        </Pressable>
+        <View style={styles.headerButtons}>
+          <Pressable onPress={() => navigation.navigate("Compose")} style={styles.plusBtn} hitSlop={6}>
+            <Icon name="plus" color={colors.background} size={22} strokeWidth={2.75} />
+          </Pressable>
+          <Pressable onPress={() => navigation.navigate("Dialogs")} style={styles.messagesBtn} hitSlop={6}>
+            <Icon name="send" color={colors.text} size={22} />
+            {unread > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadText}>{unread > 99 ? "99+" : unread}</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.segmented}>
@@ -224,6 +237,10 @@ export function FeedScreen() {
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, paddingTop: 10 },
   title: { fontFamily: fonts.display, fontSize: 30, color: colors.text },
+  headerButtons: { flexDirection: "row", gap: 8 },
+  messagesBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.card, alignItems: "center", justifyContent: "center" },
+  unreadBadge: { position: "absolute", top: -4, right: -4, minWidth: 24, height: 24, paddingHorizontal: 5, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: colors.background },
+  unreadText: { fontFamily: fonts.bodyBold, fontSize: 11, color: colors.background },
   plusBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
 
   segmented: {

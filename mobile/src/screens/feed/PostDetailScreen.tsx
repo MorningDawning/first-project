@@ -14,7 +14,6 @@ import { useAuth } from "../../context/AuthContext";
 import { commentsApi, postsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { plural, timeAgo } from "../../lib/time";
-import { useHideTabBar } from "../../navigation/useHideTabBar";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
 import { FeedStackParamList } from "../../navigation/types";
 import { FeedPost, FriendStatus, PostComment } from "../../types";
@@ -25,7 +24,6 @@ export function PostDetailScreen({ route, navigation }: Props) {
   const { postId } = route.params;
   const { user: me } = useAuth();
   const insets = useSafeAreaInsets();
-  useHideTabBar();
 
   const [post, setPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -176,7 +174,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
             </View>
           </Pressable>
           {author && author.friendStatus !== "self" && (
-            <View style={{ width: 150 }}>
+            <View style={{ flexShrink: 0 }}>
               <FriendActionButton userId={post.user.id} status={author.friendStatus} variant="small" onChanged={onAuthorChanged} />
             </View>
           )}

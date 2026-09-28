@@ -128,6 +128,27 @@ export async function seedCommunity(prisma: PrismaClient, viewers: User[]) {
     await prisma.postLike.createMany({
       data: [annaPost, igorPost, dimaPost].map((p) => ({ postId: p.id, userId: v.id })),
     });
+
+    // Переписка: с Димой — обмен пивом, у Анны — непрочитанная карточка.
+    const stout = beerId("Foreign Extra Stout");
+    const rosé = beerId("Rosé Lambic");
+    const msg = (from: string, to: string, h: number, extra: { text?: string; beerId?: string | null; read?: boolean }) =>
+      prisma.message.create({
+        data: {
+          senderId: from,
+          recipientId: to,
+          text: extra.text ?? null,
+          beerId: extra.beerId ?? null,
+          createdAt: hoursAgo(h),
+          readAt: extra.read === false ? null : hoursAgo(h - 0.02),
+        },
+      });
+    await msg(users.dima.id, v.id, 3, { text: "Ты где сейчас? Хочу взять что-нибудь в магазине" });
+    await msg(v.id, users.dima.id, 2.9, { text: "Дома. Возьми вот это, тебе точно зайдёт" });
+    await msg(v.id, users.dima.id, 2.88, { beerId: stout });
+    await msg(users.dima.id, v.id, 0.3, { text: "О, 86%! Беру две.", read: false });
+    await msg(users.dima.id, v.id, 0.29, { text: "Заскочу через час?", read: false });
+    if (rosé) await msg(users.anna.id, v.id, 5, { beerId: rosé, read: false });
   }
 
   return { users, posts: { annaPost, igorPost, dimaPost, mariaPost, nerdPost } };
