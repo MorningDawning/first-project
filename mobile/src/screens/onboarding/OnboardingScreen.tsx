@@ -31,71 +31,153 @@ const TINTS: Record<Tint, { badge: string; selectedBg: string; border: string }>
   primary: { badge: "#FBDFD3", selectedBg: "#FCE6DB", border: colors.primary },
 };
 
-type QuizOption = { value: number | Occasion; title: string; icon: string; tint: Tint };
-type Question = { field: Field; label: string; description: string; options: [QuizOption, QuizOption] };
+type QuizOption = { value: number | Occasion; title: string; icon: string; tint: Tint; rationale: string };
+type Question = { field: Field; label: string; options: [QuizOption, QuizOption] };
 
+// Вопросы намеренно не про пиво напрямую — по образцу винных квизов вроде
+// Vivino ("какой кофе вы любите?" → чёрный кофе разлюбит терпкость в вине).
+// Химия горьких/кислых/сладких рецепторов действительно частично общая для
+// разных продуктов, так что связка с пивом объясняется в rationale под
+// выбранным ответом — а не раскрывается заранее в самом вопросе.
 const QUESTIONS: Question[] = [
   {
     field: "bitterness",
-    label: "Горечь",
-    description: "Хмель отвечает за горчинку во вкусе — от едва уловимой до резкой, как в IPA.",
+    label: "Какой кофе ты выбираешь?",
     options: [
-      { value: 25, title: "Мягкая", icon: "🍯", tint: "accent" },
-      { value: 75, title: "Выраженная", icon: "🌿", tint: "primary" },
+      {
+        value: 25,
+        title: "С молоком и сиропом",
+        icon: "🥛",
+        tint: "accent",
+        rationale: "Если комфортнее смягчать горечь кофе молоком, скорее всего понравится и мягкая горечь в пиве.",
+      },
+      {
+        value: 75,
+        title: "Чёрный, без сахара",
+        icon: "☕",
+        tint: "primary",
+        rationale: "Кофеин и хмелевая горечь бьют по одним рецепторам — любители чёрного кофе почти всегда легко заходят на горькие сорта вроде IPA.",
+      },
     ],
   },
   {
     field: "body",
-    label: "Плотность",
-    description: "Насколько «тяжёлым» пиво ощущается во рту — от лёгкого лагера до плотного стаута.",
+    label: "Что тебе ближе на обед?",
     options: [
-      { value: 25, title: "Лёгкое", icon: "💧", tint: "accent" },
-      { value: 75, title: "Плотное", icon: "🍺", tint: "primary" },
+      {
+        value: 25,
+        title: "Лёгкий бульон",
+        icon: "💧",
+        tint: "accent",
+        rationale: "Любовь к лёгкой еде обычно совпадает с любовью к лёгкому, воздушному пиву вроде лагера.",
+      },
+      {
+        value: 75,
+        title: "Наваристый крем-суп",
+        icon: "🍲",
+        tint: "primary",
+        rationale: "Чем плотнее и сытнее тебе нравится еда, тем вероятнее зайдёт плотное тело стаута или портера.",
+      },
     ],
   },
   {
     field: "aroma",
-    label: "Аромат хмеля",
-    description: "Интенсивность цветочных, цитрусовых и травяных нот в запахе.",
+    label: "Какой аромат тебе приятнее?",
     options: [
-      { value: 25, title: "Сдержанный", icon: "🌾", tint: "accent" },
-      { value: 75, title: "Яркий", icon: "✨", tint: "primary" },
+      {
+        value: 25,
+        title: "Едва уловимый",
+        icon: "🕯️",
+        tint: "accent",
+        rationale: "Тебе, скорее всего, ближе сдержанный, ненавязчивый аромат — как у лагеров с лёгким хмелем.",
+      },
+      {
+        value: 75,
+        title: "Яркая цедра цитруса",
+        icon: "🍋",
+        tint: "primary",
+        rationale: "Эфирные масла в цедре цитрусовых химически похожи на ароматику хмеля — любишь первое, полюбишь и яркие IPA.",
+      },
     ],
   },
   {
     field: "sweetness",
-    label: "Сладость",
-    description: "Остаточная сладость солода — от сухого хрустящего финиша до карамельной мягкости.",
+    label: "На десерт ты выбираешь...",
     options: [
-      { value: 25, title: "Сухое", icon: "🍋", tint: "accent" },
-      { value: 75, title: "Сладкое", icon: "🍬", tint: "primary" },
+      {
+        value: 25,
+        title: "Тёмный шоколад",
+        icon: "🍫",
+        tint: "accent",
+        rationale: "Если комфортно без сахара, вероятно понравится сухой, некрикливо-сладкий финиш пива.",
+      },
+      {
+        value: 75,
+        title: "Карамель и мёд",
+        icon: "🍯",
+        tint: "primary",
+        rationale: "Тяга к карамели и мёду часто выдаёт любовь к солодовой сладости — она есть в элях и портерах.",
+      },
     ],
   },
   {
     field: "sourness",
-    label: "Кислотность",
-    description: "Освежающая кислинка, характерная для сауэров и некоторых пшеничных сортов.",
+    label: "Из закусок тебе ближе...",
     options: [
-      { value: 25, title: "Гладкая", icon: "🌊", tint: "accent" },
-      { value: 75, title: "С кислинкой", icon: "🍏", tint: "primary" },
+      {
+        value: 25,
+        title: "Свежие сладкие фрукты",
+        icon: "🍑",
+        tint: "accent",
+        rationale: "Если кислинка не твоё, лучше заходить с гладких, некислых сортов пива.",
+      },
+      {
+        value: 75,
+        title: "Квашеная капуста, соленья",
+        icon: "🥒",
+        tint: "primary",
+        rationale: "Любовь к ферментированным продуктам — почти прямой сигнал, что зайдут кислые сауэры.",
+      },
     ],
   },
   {
     field: "targetAbv",
-    label: "Крепость",
-    description: "От лёгких сессионных сортов до крепких имперских элей.",
+    label: "Как проходит твой любимый вечер?",
     options: [
-      { value: 4, title: "Лёгкое", icon: "🍃", tint: "accent" },
-      { value: 8.5, title: "Крепкое", icon: "🔥", tint: "primary" },
+      {
+        value: 4,
+        title: "Активно, в компании",
+        icon: "🎉",
+        tint: "accent",
+        rationale: "Для активных встреч обычно выбирают лёгкое пиво, которое можно пить не спеша весь вечер.",
+      },
+      {
+        value: 8.5,
+        title: "Спокойно, наедине с книгой",
+        icon: "📖",
+        tint: "primary",
+        rationale: "Для неспешного вечера отлично подходит крепкое пиво — его смакуют маленькими глотками.",
+      },
     ],
   },
   {
     field: "occasion",
-    label: "Настроение",
-    description: "Что тебе ближе — проверенная классика или готовность пробовать неожиданное.",
+    label: "В любимом кафе ты берёшь...",
     options: [
-      { value: "classic", title: "Классика", icon: "⭐", tint: "accent" },
-      { value: "adventurous", title: "Эксперимент", icon: "🎲", tint: "primary" },
+      {
+        value: "classic",
+        title: "Свой обычный заказ",
+        icon: "⭐",
+        tint: "accent",
+        rationale: "Тебе комфортно с проверенным — предложим классические, надёжные стили.",
+      },
+      {
+        value: "adventurous",
+        title: "Новинку из спецменю",
+        icon: "🎲",
+        tint: "primary",
+        rationale: "Любишь пробовать новое — покажем более смелые и необычные сорта.",
+      },
     ],
   },
 ];
@@ -118,6 +200,7 @@ export function OnboardingScreen({ onDone }: Props) {
   const [resultError, setResultError] = useState(false);
 
   const anim = useRef(new Animated.Value(0)).current;
+  const rationaleAnim = useRef(new Animated.Value(0)).current;
   const dotAnims = useRef(SCALE_ROWS.map(() => new Animated.Value(0))).current;
   const pulse = useRef(new Animated.Value(1)).current;
 
@@ -144,6 +227,17 @@ export function OnboardingScreen({ onDone }: Props) {
     );
     Animated.parallel(animations).start();
   }, [step, result, dotAnims]);
+
+  useEffect(() => {
+    if (selectedValue === null) return;
+    rationaleAnim.setValue(0);
+    Animated.timing(rationaleAnim, {
+      toValue: 1,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [selectedValue, rationaleAnim]);
 
   useEffect(() => {
     if (step !== "bridge") return;
@@ -175,24 +269,23 @@ export function OnboardingScreen({ onDone }: Props) {
   }
 
   function selectOption(field: Field, value: number | Occasion) {
+    if (selectedValue !== null) return;
     setSelectedValue(value);
-    const nextAnswers = { ...answers, [field]: value };
-    setAnswers(nextAnswers);
-    const isLast = questionIndex === QUESTIONS.length - 1;
+    setAnswers((prev) => ({ ...prev, [field]: value }));
+  }
 
-    // Небольшая пауза даёт увидеть подсветку выбранной карточки, прежде чем
-    // экран уедет — без этого тап ощущался как мгновенный и незаметный.
-    setTimeout(() => {
-      transitionTo(() => {
-        if (isLast) {
-          setStep("result");
-          submitQuiz(nextAnswers as Required<Answers>);
-        } else {
-          setQuestionIndex((i) => i + 1);
-          setSelectedValue(null);
-        }
-      });
-    }, 220);
+  function goNext() {
+    const isLast = questionIndex === QUESTIONS.length - 1;
+    const finalAnswers = answers;
+    transitionTo(() => {
+      if (isLast) {
+        setStep("result");
+        submitQuiz(finalAnswers as Required<Answers>);
+      } else {
+        setQuestionIndex((i) => i + 1);
+        setSelectedValue(null);
+      }
+    });
   }
 
   const animatedStyle = {
@@ -208,7 +301,7 @@ export function OnboardingScreen({ onDone }: Props) {
   return (
     <Screen>
       {step === "quiz" && (
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.quizScroll}>
           <View style={styles.topRow}>
             <View style={styles.progressWrap}>
               <Text style={styles.progressLabel}>
@@ -227,7 +320,6 @@ export function OnboardingScreen({ onDone }: Props) {
 
           <Animated.View style={[styles.quizBody, animatedStyle]}>
             <Text style={styles.questionLabel}>{question.label}</Text>
-            <Text style={styles.questionDescription}>{question.description}</Text>
             <View style={styles.optionsCol}>
               {question.options.map((opt) => {
                 const tint = TINTS[opt.tint];
@@ -251,8 +343,26 @@ export function OnboardingScreen({ onDone }: Props) {
                 );
               })}
             </View>
+
+            {selectedValue !== null && (
+              <Animated.View
+                style={[
+                  styles.rationaleCard,
+                  {
+                    opacity: rationaleAnim,
+                    transform: [{ translateY: rationaleAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+                  },
+                ]}
+              >
+                <Text style={styles.rationaleLabel}>Почему мы спрашиваем</Text>
+                <Text style={styles.rationaleText}>
+                  {question.options.find((o) => o.value === selectedValue)?.rationale}
+                </Text>
+                <Button title="Далее →" onPress={goNext} style={styles.rationaleButton} />
+              </Animated.View>
+            )}
           </Animated.View>
-        </View>
+        </ScrollView>
       )}
 
       {step === "result" && (
@@ -357,6 +467,7 @@ const DOT_SIZE = 18;
 
 const styles = StyleSheet.create({
   content: { flex: 1, padding: spacing.lg },
+  quizScroll: { flexGrow: 1, padding: spacing.lg },
 
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   progressWrap: { flex: 1, marginRight: spacing.md, gap: spacing.xs },
@@ -367,13 +478,6 @@ const styles = StyleSheet.create({
 
   quizBody: { flex: 1, justifyContent: "center", gap: spacing.lg },
   questionLabel: { fontSize: 22, fontWeight: "800", color: colors.primary, textAlign: "center" },
-  questionDescription: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: "center",
-    marginTop: -spacing.sm,
-    paddingHorizontal: spacing.sm,
-  },
   optionsCol: { gap: spacing.md },
   optionCard: {
     backgroundColor: colors.card,
@@ -393,6 +497,24 @@ const styles = StyleSheet.create({
   optionIconBadge: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center" },
   optionIcon: { fontSize: 36 },
   optionTitle: { fontSize: 18, fontWeight: "700", color: colors.text },
+
+  rationaleCard: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  rationaleLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.accent,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  rationaleText: { fontSize: 14, color: colors.text, lineHeight: 20 },
+  rationaleButton: { marginTop: spacing.xs },
 
   resultScroll: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
   resultLoading: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.xl * 2, gap: spacing.md },
