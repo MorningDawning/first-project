@@ -47,7 +47,7 @@ profilesRouter.get("/:id", requireAuth, wrap(async (req, res) => {
     avatarUrl: user.avatarUrl,
     bio: user.bio,
     city: user.city,
-    online: isOnline(user.lastSeenAt),
+    online: isOnline(user),
     relation,
     mutualFriends: theirFriendIds.filter((id) => mine.has(id)).length,
     stats: { friendCount: theirFriendIds.length, scanCount, reviewCount, postCount },

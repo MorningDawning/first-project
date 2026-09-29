@@ -8,6 +8,8 @@ async function main() {
   console.log("Очистка базы...");
   await prisma.report.deleteMany();
   await prisma.message.deleteMany();
+  await prisma.conversationMember.deleteMany();
+  await prisma.conversation.deleteMany();
   await prisma.commentLike.deleteMany();
   await prisma.comment.deleteMany();
   await prisma.postLike.deleteMany();

@@ -53,7 +53,8 @@ export async function seedCommunity(prisma: PrismaClient, viewers: User[]) {
   const ids = Object.values(users).map((u) => u.id);
 
   // Чистим прежнее содержимое этих людей, чтобы повторный запуск не плодил дубли.
-  await prisma.message.deleteMany({ where: { OR: [{ senderId: { in: ids } }, { recipientId: { in: ids } }] } });
+  // Чаты (личные и группы) с участием этих людей; сообщения и участники уходят каскадом.
+  await prisma.conversation.deleteMany({ where: { members: { some: { userId: { in: ids } } } } });
   await prisma.post.deleteMany({ where: { userId: { in: ids } } });
   await prisma.friendship.deleteMany({ where: { OR: [{ userId: { in: ids } }, { friendId: { in: ids } }] } });
   await prisma.review.deleteMany({ where: { userId: { in: ids } } });
@@ -129,26 +130,73 @@ export async function seedCommunity(prisma: PrismaClient, viewers: User[]) {
       data: [annaPost, igorPost, dimaPost].map((p) => ({ postId: p.id, userId: v.id })),
     });
 
-    // Переписка: с Димой — обмен пивом, у Анны — непрочитанная карточка.
+    // Переписка: с Димой обмен пивом, у Анны непрочитанная карточка, плюс общая группа.
     const stout = beerId("Foreign Extra Stout");
     const rosé = beerId("Rosé Lambic");
-    const msg = (from: string, to: string, h: number, extra: { text?: string; beerId?: string | null; read?: boolean }) =>
+    const hazy = beerId("Hazy Jane");
+    const pairKey = (a: string, b: string) => (a < b ? `${a}:${b}` : `${b}:${a}`);
+    const say = (chatId: string, from: User, h: number, extra: { text?: string; beerId?: string | null; kind?: string }) =>
       prisma.message.create({
         data: {
-          senderId: from,
-          recipientId: to,
+          conversationId: chatId,
+          senderId: from.id,
+          kind: extra.kind ?? "user",
           text: extra.text ?? null,
           beerId: extra.beerId ?? null,
           createdAt: hoursAgo(h),
-          readAt: extra.read === false ? null : hoursAgo(h - 0.02),
         },
       });
-    await msg(users.dima.id, v.id, 3, { text: "Ты где сейчас? Хочу взять что-нибудь в магазине" });
-    await msg(v.id, users.dima.id, 2.9, { text: "Дома. Возьми вот это, тебе точно зайдёт" });
-    await msg(v.id, users.dima.id, 2.88, { beerId: stout });
-    await msg(users.dima.id, v.id, 0.3, { text: "О, 86%! Беру две.", read: false });
-    await msg(users.dima.id, v.id, 0.29, { text: "Заскочу через час?", read: false });
-    if (rosé) await msg(users.anna.id, v.id, 5, { beerId: rosé, read: false });
+    const touch = (chatId: string, h: number) =>
+      prisma.conversation.update({ where: { id: chatId }, data: { lastMessageAt: hoursAgo(h) } });
+
+    const withDima = await prisma.conversation.create({
+      data: {
+        type: "direct",
+        directKey: pairKey(v.id, users.dima.id),
+        createdById: users.dima.id,
+        members: { create: [{ userId: v.id, lastReadAt: hoursAgo(1) }, { userId: users.dima.id, lastReadAt: new Date() }] },
+      },
+    });
+    await say(withDima.id, users.dima, 3, { text: "Ты где сейчас? Хочу взять что-нибудь в магазине" });
+    await say(withDima.id, v, 2.9, { text: "Дома. Возьми вот это, тебе точно зайдёт" });
+    await say(withDima.id, v, 2.88, { beerId: stout });
+    await say(withDima.id, users.dima, 0.3, { text: "О, 86%! Беру две." });
+    await say(withDima.id, users.dima, 0.29, { text: "Заскочу через час?" });
+    await touch(withDima.id, 0.29);
+
+    if (rosé) {
+      const withAnna = await prisma.conversation.create({
+        data: {
+          type: "direct",
+          directKey: pairKey(v.id, users.anna.id),
+          createdById: users.anna.id,
+          members: { create: [{ userId: v.id, lastReadAt: hoursAgo(6) }, { userId: users.anna.id, lastReadAt: new Date() }] },
+        },
+      });
+      await say(withAnna.id, users.anna, 5, { beerId: rosé });
+      await touch(withAnna.id, 5);
+    }
+
+    const friday = await prisma.conversation.create({
+      data: {
+        type: "group",
+        title: "Пятничный бар",
+        createdById: users.dima.id,
+        members: {
+          create: [
+            { userId: users.dima.id, role: "owner", lastReadAt: new Date() },
+            { userId: users.anna.id, lastReadAt: new Date() },
+            { userId: users.igor.id, lastReadAt: new Date() },
+            { userId: v.id, lastReadAt: hoursAgo(3) },
+          ],
+        },
+      },
+    });
+    await say(friday.id, users.dima, 4, { kind: "system", text: "Группа «Пятничный бар» создана" });
+    await say(friday.id, users.anna, 2.5, { text: "Кто в пятницу в «Хмельнице»?" });
+    await say(friday.id, users.igor, 2.2, { text: "Я за. Тогда в 8 у входа" });
+    if (hazy) await say(friday.id, users.dima, 2, { text: "Там на кране Hazy Jane", beerId: hazy });
+    await touch(friday.id, 2);
   }
 
   return { users, posts: { annaPost, igorPost, dimaPost, mariaPost, nerdPost } };

@@ -27,18 +27,18 @@ model User {
   prefBody       Int?
   prefAroma      Int?
 
-  reviews          Review[]
-  scans            ScanHistory[]
-  posts            Post[]
-  postLikes        PostLike[]
-  comments         Comment[]
-  commentLikes     CommentLike[]
-  wishlist         Wishlist[]
-  friendsFrom      Friendship[]  @relation("FriendshipFrom")
-  friendsTo        Friendship[]  @relation("FriendshipTo")
-  sentMessages     Message[]     @relation("MessageSender")
-  receivedMessages Message[]     @relation("MessageRecipient")
-  reports          Report[]
+  reviews      Review[]
+  scans        ScanHistory[]
+  posts        Post[]
+  postLikes    PostLike[]
+  comments     Comment[]
+  commentLikes CommentLike[]
+  wishlist     Wishlist[]
+  friendsFrom  Friendship[]         @relation("FriendshipFrom")
+  friendsTo    Friendship[]         @relation("FriendshipTo")
+  messages     Message[]
+  memberships  ConversationMember[]
+  reports      Report[]
 }
 
 model Brewery {
@@ -176,21 +176,50 @@ model CommentLike {
   @@id([commentId, userId])
 }
 
+model Conversation {
+  id            String   @id @default(cuid())
+  type          String // "direct" | "group"
+  title         String? // только у групп
+  createdById   String?
+  createdAt     DateTime @default(now())
+  lastMessageAt DateTime @default(now())
+  directKey     String?  @unique // "<меньший id>:<больший id>" — на пару людей один личный чат
+
+  members  ConversationMember[]
+  messages Message[]
+}
+
+model ConversationMember {
+  conversationId String
+  userId         String
+  role           String    @default("member") // "owner" | "member"
+  joinedAt       DateTime  @default(now())
+  lastReadAt     DateTime? // всё, что старше, прочитано этим участником
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
 model Message {
-  id          String    @id @default(cuid())
-  senderId    String
-  recipientId String
-  text        String?
-  beerId      String? // сообщение-карточка с пивом
-  createdAt   DateTime  @default(now())
-  readAt      DateTime?
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  kind           String   @default("user") // "user" | "system"
+  text           String?
+  beerId         String? // сообщение-карточка с пивом
+  photoUrl       String?
+  photoWidth     Int?
+  photoHeight    Int?
+  createdAt      DateTime @default(now())
 
-  sender    User  @relation("MessageSender", fields: [senderId], references: [id])
-  recipient User  @relation("MessageRecipient", fields: [recipientId], references: [id])
-  beer      Beer? @relation(fields: [beerId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+  beer         Beer?        @relation(fields: [beerId], references: [id])
 
-  @@index([recipientId, readAt])
-  @@index([senderId, recipientId, createdAt])
+  @@index([conversationId, createdAt])
 }
 
 model Report {

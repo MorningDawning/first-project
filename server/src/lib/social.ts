@@ -1,11 +1,14 @@
 import { Beer, Brewery, Post, User } from "@prisma/client";
 import { prisma } from "./prisma";
 import { TasteVector, computeUserTasteProfile, matchPercent, tasteVector } from "./taste";
+import { isConnected } from "./realtime";
 
 const ONLINE_WINDOW_MS = 2 * 60 * 1000;
 
-export function isOnline(lastSeenAt: Date | null): boolean {
-  return lastSeenAt !== null && Date.now() - lastSeenAt.getTime() < ONLINE_WINDOW_MS;
+/** В сети: открыто живое соединение или заходил в приложение в последние пару минут. */
+export function isOnline(user: { id: string; lastSeenAt: Date | null }): boolean {
+  if (isConnected(user.id)) return true;
+  return user.lastSeenAt !== null && Date.now() - user.lastSeenAt.getTime() < ONLINE_WINDOW_MS;
 }
 
 export type UserBrief = { id: string; name: string; username: string | null; avatarUrl: string | null };

@@ -14,7 +14,8 @@ import { wishlistRouter } from "./routes/wishlist";
 import { friendsRouter } from "./routes/friends";
 import { postsRouter, commentsRouter } from "./routes/posts";
 import { profilesRouter } from "./routes/profiles";
-import { messagesRouter } from "./routes/messages";
+import { chatsRouter } from "./routes/chats";
+import { attachRealtime } from "./lib/realtime";
 import { UPLOADS_DIR, uploadsRouter } from "./routes/uploads";
 
 // Express 4 doesn't forward a rejected promise from an async route handler
@@ -54,7 +55,7 @@ app.use("/friends", friendsRouter);
 app.use("/posts", postsRouter);
 app.use("/comments", commentsRouter);
 app.use("/users", profilesRouter);
-app.use("/messages", messagesRouter);
+app.use("/chats", chatsRouter);
 app.use("/uploads", uploadsRouter);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -63,6 +64,7 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 const port = Number(process.env.PORT) || 4000;
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`BeerVia API listening on http://localhost:${port}`);
 });
+attachRealtime(server);

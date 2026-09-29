@@ -23,7 +23,7 @@ friendsRouter.get("/", requireAuth, wrap(async (req, res) => {
     computeUserTasteProfile(me),
   ]);
   const matches = await Promise.all(users.map((u) => matchWithMe(myProfile, u.id)));
-  res.json(users.map((u, i) => ({ ...userBrief(u), match: matches[i], online: isOnline(u.lastSeenAt) })));
+  res.json(users.map((u, i) => ({ ...userBrief(u), match: matches[i], online: isOnline(u) })));
 }));
 
 // GET /friends/requests — входящие заявки.
