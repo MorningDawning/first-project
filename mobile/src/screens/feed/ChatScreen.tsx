@@ -33,6 +33,7 @@ export function ChatScreen({ route, navigation }: Props) {
   const [focused, setFocused] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const nearBottom = useRef(true);
+  const justSent = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +66,10 @@ export function ChatScreen({ route, navigation }: Props) {
     setSending(true);
     try {
       await messagesApi.send(userId, body);
+      // Как в Telegram: своё сообщение всегда возвращает к концу переписки,
+      // даже если до этого пролистал вверх искать старое.
+      nearBottom.current = true;
+      justSent.current = true;
       await load();
     } catch (e) {
       Alert.alert("Не отправилось", apiErrorMessage(e));
@@ -114,7 +119,11 @@ export function ChatScreen({ route, navigation }: Props) {
           // Новое сообщение прокручивает вниз, только если читатель и так был внизу;
           // а когда список сжимается или растягивается под клавиатуру — всегда, чтобы
           // последнее сообщение оставалось перед глазами.
-          onContentSizeChange={() => nearBottom.current && scrollToBottom()}
+          onContentSizeChange={() => {
+            if (!nearBottom.current) return;
+            listRef.current?.scrollToEnd({ animated: justSent.current });
+            justSent.current = false;
+          }}
           onLayout={scrollToBottom}
           onScroll={(e) => {
             const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
