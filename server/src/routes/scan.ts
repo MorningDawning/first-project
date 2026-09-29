@@ -42,10 +42,27 @@ scanRouter.post("/", requireAuth, upload.single("photo"), async (req, res) => {
     }
   }
 
+  // Кандидаты от ML, если уверенно не узнали: покажем пользователю «возможно, это…».
+  let suggestions: { id: string; name: string; breweryName: string; style: string }[] = [];
+
   if (!beer && req.file) {
-    const candidate = await recognizeLabel(req.file.buffer);
-    if (candidate) {
-      beer = await prisma.beer.findFirst({ where: { name: candidate.beerName } });
+    const ml = await recognizeLabel(req.file.buffer);
+    if (ml) {
+      const found = [];
+      for (const candidate of ml.candidates) {
+        const match = await prisma.beer.findFirst({
+          where: {
+            name: candidate.beerName,
+            ...(candidate.breweryName ? { brewery: { name: candidate.breweryName } } : {}),
+          },
+          include: { brewery: true },
+        });
+        if (match) found.push({ beer: match, confidence: candidate.confidence });
+      }
+      if (ml.recognized && found[0]) beer = found[0].beer;
+      else suggestions = found.filter((f) => f.confidence >= 0.6).map((f) => ({
+        id: f.beer.id, name: f.beer.name, breweryName: f.beer.brewery.name, style: f.beer.style,
+      }));
     }
   }
 
@@ -59,6 +76,7 @@ scanRouter.post("/", requireAuth, upload.single("photo"), async (req, res) => {
       error: barcode ? "Этого пива пока нет в базе" : "Не удалось распознать пиво по фото",
       code: "NOT_RECOGNIZED",
       barcode: barcode ?? null,
+      suggestions,
     });
   }
 

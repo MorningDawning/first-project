@@ -24,7 +24,10 @@ async function main() {
     console.error(`Не найден ${labelsPath}`);
     process.exit(1);
   }
-  const labels: Record<string, string> = JSON.parse(fs.readFileSync(labelsPath, "utf-8"));
+  const raw: Record<string, string | { beer: string; brewery?: string }> = JSON.parse(fs.readFileSync(labelsPath, "utf-8"));
+  const labels: Record<string, string> = Object.fromEntries(
+    Object.entries(raw).map(([slug, value]) => [slug, typeof value === "string" ? value : value.beer])
+  );
 
   let updated = 0;
   let skipped = 0;

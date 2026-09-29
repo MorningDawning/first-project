@@ -100,21 +100,24 @@ Backend должен быть запущен и слушать порт `4000` �
 
 ## ML — распознавание этикетки (`ml/`)
 
-Дообучение CLIP (linear probe — backbone заморожен, обучается только классификатор поверх
-эмбеддингов) на собственном датасете фото банок/этикеток. Полная инструкция — `ml/README.md` и
-протокол съёмки датасета — `ml/dataset/README.md`.
+Нейросеть CLIP превращает фото в вектор, а сервис сравнивает его с «галереей» эталонных фото
+каждого пива (поиск по сходству). Новое пиво добавляется фото без переобучения, а незнакомую
+этикетку сервис честно не узнаёт. Пошаговая инструкция для Windows — `ml/README.md`, протокол
+съёмки датасета — `ml/dataset/README.md`.
 
 ```bash
 cd ml
-python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
+python -m venv venv && source venv/Scripts/activate   # Git Bash на Windows; на Mac/Linux: venv/bin/activate
 pip install -r requirements.txt
-python train_clip.py --data dataset --out checkpoint.joblib   # после того как собраны фото
-BEERVIA_ML_CHECKPOINT=checkpoint.joblib uvicorn serve:app --port 8001
+python fetch_off_photos.py    # фото упаковок из открытой базы Open Food Facts
+python build_gallery.py       # собрать галерею
+python evaluate.py            # проверить качество на фото, которых в галерее нет
+uvicorn serve:app --port 8001
 ```
 
 Backend находит сервис через `ML_SERVICE_URL` в `server/.env` (по умолчанию `http://localhost:8001`).
-Без обученного чекпоинта или без запущенного сервиса `/scan` просто уходит в резервный сценарий —
-остальное приложение работает как обычно.
+Без галереи или без запущенного сервиса `/scan` отвечает «не нашли» и предлагает штрихкод или ручное
+добавление, остальное приложение работает как обычно.
 
 ## Известные упрощения (что доделать для продакшена)
 

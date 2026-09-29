@@ -1,15 +1,14 @@
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
 
-type MlCandidate = { beerName: string; confidence: number };
-type MlResponse = { recognized: boolean; candidates: MlCandidate[] };
+export type MlCandidate = { beerName: string; breweryName?: string; confidence: number };
+export type MlResult = { recognized: boolean; candidates: MlCandidate[] };
 
 /**
- * Calls the CLIP label-recognition service (see /ml). Returns null whenever
- * recognition isn't available — no ML_SERVICE_URL configured, the service is
- * down, or it hasn't loaded a trained checkpoint yet — so callers can fall
- * back to another scan strategy instead of failing the request.
+ * Обращается к сервису распознавания этикеток (см. /ml). Возвращает null, если распознавание
+ * недоступно: ML_SERVICE_URL не задан, сервис не отвечает или в нём ещё нет галереи фото.
+ * Тогда вызывающий код просто продолжает без него (штрихкод, ручной поиск).
  */
-export async function recognizeLabel(photo: Buffer): Promise<MlCandidate | null> {
+export async function recognizeLabel(photo: Buffer): Promise<MlResult | null> {
   if (!ML_SERVICE_URL) return null;
 
   try {
@@ -23,9 +22,8 @@ export async function recognizeLabel(photo: Buffer): Promise<MlCandidate | null>
     });
     if (!response.ok) return null;
 
-    const result = (await response.json()) as MlResponse;
-    if (!result.recognized || result.candidates.length === 0) return null;
-    return result.candidates[0];
+    const result = (await response.json()) as MlResult;
+    return Array.isArray(result.candidates) ? result : null;
   } catch {
     return null;
   }

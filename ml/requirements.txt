@@ -3,6 +3,5 @@ uvicorn[standard]>=0.30
 python-multipart>=0.0.9
 open_clip_torch>=2.26
 torch>=2.4
-scikit-learn>=1.5
-joblib>=1.4
+numpy>=1.26
 Pillow>=10.4

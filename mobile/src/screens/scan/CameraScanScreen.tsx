@@ -21,6 +21,13 @@ function isNotRecognized(e: unknown): boolean {
   return axios.isAxiosError(e) && e.response?.data?.code === "NOT_RECOGNIZED";
 }
 
+type Suggestion = { id: string; name: string; breweryName: string; style: string };
+
+/** Что предложить пользователю, если не узнали: похожие пива от нейросети (если она сомневалась). */
+function suggestionsOf(e: unknown): Suggestion[] {
+  return axios.isAxiosError(e) && Array.isArray(e.response?.data?.suggestions) ? e.response.data.suggestions : [];
+}
+
 export function CameraScanScreen() {
   const navigation = useNavigation<Nav>();
   const isFocused = useIsFocused();
@@ -31,7 +38,7 @@ export function CameraScanScreen() {
   const [error, setError] = useState<string | null>(null);
   const [found, setFound] = useState<BeerDetail | null>(null);
   // Пиво не нашли: показываем предложение найти вручную или добавить (barcode — если сканировали штрихкод).
-  const [notFound, setNotFound] = useState<{ barcode: string | null } | null>(null);
+  const [notFound, setNotFound] = useState<{ barcode: string | null; suggestions: Suggestion[] } | null>(null);
   const lastBarcode = useRef<{ code: string; at: number } | null>(null);
   // Останавливаем рендер CameraView сразу после съёмки/выбора фото, не дожидаясь
   // навигации — иначе нативная камера-сессия иногда остаётся «висеть» в фоне
@@ -51,7 +58,7 @@ export function CameraScanScreen() {
       // карточку пива только по явному тапу «Открыть».
       setFound(beer);
     } catch (e) {
-      if (isNotRecognized(e)) setNotFound({ barcode: null });
+      if (isNotRecognized(e)) setNotFound({ barcode: null, suggestions: suggestionsOf(e) });
       else {
         setError(apiErrorMessage(e, "Не удалось распознать пиво"));
         setCameraActive(true);
@@ -72,7 +79,7 @@ export function CameraScanScreen() {
     try {
       setFound(await scanApi.scanBarcode(code));
     } catch (e) {
-      if (isNotRecognized(e)) setNotFound({ barcode: code });
+      if (isNotRecognized(e)) setNotFound({ barcode: code, suggestions: [] });
       else setError(apiErrorMessage(e, "Не удалось найти пиво по штрихкоду"));
     } finally {
       setScanning(false);
@@ -100,6 +107,11 @@ export function CameraScanScreen() {
     const barcode = notFound?.barcode ?? undefined;
     scanAgain();
     navigation.navigate("HomeTab", { screen: "AddBeer", params: { barcode } });
+  }
+
+  function openSuggestion(beerId: string) {
+    scanAgain();
+    navigation.navigate("HomeTab", { screen: "BeerDetail", params: { beerId } });
   }
 
   function searchCatalog() {
@@ -180,6 +192,20 @@ export function CameraScanScreen() {
                   ? `Штрихкода ${notFound.barcode} пока нет в базе. Найдите пиво вручную или добавьте его: в следующий раз скан узнает эту банку.`
                   : "По фото не удалось узнать этикетку. Попробуйте навести камеру на штрихкод, найти пиво вручную или добавить его."}
               </Text>
+              {notFound.suggestions.length > 0 && (
+                <View style={{ gap: 6 }}>
+                  <Text style={styles.suggestTitle}>Возможно, это:</Text>
+                  {notFound.suggestions.map((sug) => (
+                    <Pressable key={sug.id} onPress={() => openSuggestion(sug.id)} style={styles.suggestRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.suggestName} numberOfLines={1}>{sug.name}</Text>
+                        <Text style={styles.suggestMeta} numberOfLines={1}>{sug.breweryName} · {sug.style}</Text>
+                      </View>
+                      <Text style={styles.suggestOpen}>Открыть</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
               <Button title="Добавить пиво" onPress={addBeer} />
               <Button title="Найти в каталоге" variant="outline" onPress={searchCatalog} />
             </View>
@@ -360,6 +386,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm + 2,
     alignSelf: "stretch",
   },
+  suggestTitle: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.textMuted },
+  suggestRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 14 },
+  suggestName: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.text },
+  suggestMeta: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
+  suggestOpen: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.primary },
   notFoundTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.text },
   notFoundText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.textMuted },
 

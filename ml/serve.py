@@ -1,37 +1,39 @@
 """
-Сервис распознавания этикеток BeerVia — принимает фото, возвращает кандидатов.
+Сервис распознавания этикеток BeerVia: принимает фото, возвращает кандидатов.
 
-Пока обученного чекпоинта нет (BEERVIA_ML_CHECKPOINT не указывает на реальный
-файл), сервис честно отвечает recognized=false — бэкенд в этом случае уходит
-в резервный сценарий (см. server/src/routes/scan.ts), само приложение при
-этом продолжает работать.
-
-Запуск:
-    pip install -r requirements.txt
     uvicorn serve:app --host 0.0.0.0 --port 8001
+
+Пока галереи нет (не запускали build_gallery.py), честно отвечает recognized=false — бэкенд в этом
+случае просит пользователя отсканировать штрихкод или добавить пиво (см. server/src/routes/scan.ts).
+
+Переменные окружения:
+  BEERVIA_ML_GALLERY   путь к галерее без расширения (по умолчанию gallery)
+  BEERVIA_EMBEDDER     clip (по умолчанию) или stub (только для тестов)
+  BEERVIA_ML_THRESHOLD своё значение порога вместо подобранного при сборке
 """
 
 import io
 import os
+from contextlib import asynccontextmanager
 
-import joblib
-import open_clip
-import torch
+import numpy as np
 from fastapi import FastAPI, File, UploadFile
 from PIL import Image
 from pydantic import BaseModel
 
-CHECKPOINT_PATH = os.environ.get("BEERVIA_ML_CHECKPOINT", "checkpoint.joblib")
-CONFIDENCE_THRESHOLD = float(os.environ.get("BEERVIA_ML_CONFIDENCE_THRESHOLD", "0.55"))
-TOP_K = 3
+from common import DEFAULT_MODEL, DEFAULT_PRETRAINED, make_embedder
+from retrieval import Gallery
 
-app = FastAPI(title="BeerVia label recognition")
+GALLERY_PATH = os.environ.get("BEERVIA_ML_GALLERY", "gallery")
+EMBEDDER_KIND = os.environ.get("BEERVIA_EMBEDDER", "clip")
+THRESHOLD_OVERRIDE = os.environ.get("BEERVIA_ML_THRESHOLD")
 
-_state: dict = {"classifier": None, "model": None, "preprocess": None, "device": "cpu"}
+_state: dict = {"gallery": None, "embedder": None}
 
 
 class Candidate(BaseModel):
     beerName: str
+    breweryName: str
     confidence: float
 
 
@@ -40,53 +42,52 @@ class RecognizeResponse(BaseModel):
     candidates: list[Candidate]
 
 
-@app.on_event("startup")
-def load_checkpoint() -> None:
-    if not os.path.exists(CHECKPOINT_PATH):
-        print(
-            f"[serve] Чекпоинт не найден ({CHECKPOINT_PATH}) — сервис будет отвечать "
-            "'не распознано'. Обучите модель: python train_clip.py"
-        )
+def load_gallery() -> None:
+    npz = os.path.exists(f"{GALLERY_PATH}.npz")
+    if not (npz and os.path.exists(f"{GALLERY_PATH}.json")):
+        print(f"[serve] Галерея не найдена ({GALLERY_PATH}.npz). Соберите её: python build_gallery.py")
         return
+    gallery = Gallery.load(GALLERY_PATH)
+    kind = "stub" if gallery.meta.get("embedder") == "stub" else EMBEDDER_KIND
+    _state["embedder"] = make_embedder(kind, DEFAULT_MODEL, DEFAULT_PRETRAINED)
+    _state["gallery"] = gallery
+    print(f"[serve] Галерея загружена: пив {len(gallery.beers)}, векторов {len(gallery.embeddings)}, порог {gallery.threshold:.2f}")
 
-    bundle = joblib.load(CHECKPOINT_PATH)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, _, preprocess = open_clip.create_model_and_transforms(
-        bundle["clip_model"], pretrained=bundle["clip_pretrained"]
-    )
-    _state.update(
-        classifier=bundle["classifier"],
-        model=model.to(device).eval(),
-        preprocess=preprocess,
-        device=device,
-    )
-    print(f"[serve] Модель загружена ({device}), классов: {len(_state['classifier'].classes_)}")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    load_gallery()
+    yield
+
+
+app = FastAPI(title="BeerVia label recognition", lifespan=lifespan)
 
 
 @app.get("/health")
 def health():
-    return {"ok": True, "modelLoaded": _state["classifier"] is not None}
+    gallery = _state["gallery"]
+    return {
+        "ok": True,
+        "modelLoaded": gallery is not None,
+        "beers": len(gallery.beers) if gallery else 0,
+        "threshold": gallery.threshold if gallery else None,
+    }
 
 
 @app.post("/recognize", response_model=RecognizeResponse)
 async def recognize(photo: UploadFile = File(...)) -> RecognizeResponse:
-    if _state["classifier"] is None:
+    gallery = _state["gallery"]
+    if gallery is None:
         return RecognizeResponse(recognized=False, candidates=[])
-
-    image_bytes = await photo.read()
     try:
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        image = Image.open(io.BytesIO(await photo.read())).convert("RGB")
     except Exception:
         return RecognizeResponse(recognized=False, candidates=[])
 
-    tensor = _state["preprocess"](image).unsqueeze(0).to(_state["device"])
-    with torch.no_grad():
-        embedding = _state["model"].encode_image(tensor)
-        embedding = embedding / embedding.norm(dim=-1, keepdim=True)
-
-    probabilities = _state["classifier"].predict_proba(embedding.cpu().numpy())[0]
-    ranked = sorted(zip(_state["classifier"].classes_, probabilities), key=lambda pair: pair[1], reverse=True)
-    candidates = [Candidate(beerName=name, confidence=round(float(p), 3)) for name, p in ranked[:TOP_K]]
-
-    recognized = bool(candidates) and candidates[0].confidence >= CONFIDENCE_THRESHOLD
+    embedding = _state["embedder"].embed([image])[0]
+    threshold = float(THRESHOLD_OVERRIDE) if THRESHOLD_OVERRIDE else None
+    recognized, found = gallery.recognize(np.asarray(embedding), threshold=threshold)
+    candidates = [
+        Candidate(beerName=b["beer"], breweryName=b["brewery"], confidence=round(score, 3)) for b, score in found
+    ]
     return RecognizeResponse(recognized=recognized, candidates=candidates)
