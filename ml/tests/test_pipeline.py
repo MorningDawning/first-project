@@ -313,3 +313,24 @@ def test_write_preview_sheet(tmp_path):
     out = tmp_path / "preview.jpg"
     write_preview([("a", original, cut), ("b", original, None)], out)
     assert Image.open(out).width > 0
+
+
+def test_finish_from_alpha_rejects_two_objects():
+    pytest.importorskip("cv2")
+    from make_cutouts import finish_from_alpha
+
+    rgb = _can_on((120, 160, 200))
+    mask = Image.new("L", rgb.size, 0)
+    d = ImageDraw.Draw(mask)
+    d.rectangle([20, 80, 120, 360], fill=255)
+    d.rectangle([180, 100, 280, 360], fill=255)
+    result, note = finish_from_alpha(rgb, mask)
+    assert result is None and "несколько" in note
+
+
+def test_pick_source_prefers_manual_front(tmp_path):
+    from make_cutouts import pick_source
+
+    _can_on((255, 255, 255)).save(tmp_path / "off-1.jpg")
+    Image.new("RGB", (40, 60), (10, 10, 10)).save(tmp_path / "front.jpg")
+    assert pick_source(tmp_path)[0].name == "front.jpg"

@@ -33,7 +33,7 @@ import pathlib
 from collections import deque
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 from common import list_photos, load_labels, open_image
 
@@ -42,6 +42,8 @@ TOLERANCE = 28          # насколько цвет может отличат�
 UNIFORM_BORDER = 0.85   # какая доля рамки картинки должна быть цвета фона, чтобы фон считался однородным
 MIN_FILL, MAX_FILL = 0.04, 0.9  # доля кадра, занятая упаковкой: меньше или больше — вырезка не удалась
 PADDING = 0.06
+SECOND_OBJECT = 0.3   # если вторая область маски не меньше этой доли от первой, в кадре несколько предметов
+MANUAL_NAMES = {"front", "manual", "studio"}  # свои фото: front.jpg в папке сорта берётся первым
 
 
 def _border_connected(background: np.ndarray) -> np.ndarray:
@@ -173,6 +175,9 @@ def finish_from_alpha(rgb: Image.Image, alpha: Image.Image) -> tuple[Image.Image
 
         count, labels, stats, _ = cv2.connectedComponentsWithStats(solid.astype(np.uint8), connectivity=8)
         if count > 1:
+            areas = sorted(stats[1:, cv2.CC_STAT_AREA], reverse=True)
+            if len(areas) > 1 and areas[1] >= SECOND_OBJECT * areas[0]:
+                return None, "в кадре несколько предметов — непонятно, какой нужен"
             biggest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
             keep = labels == biggest
             contours, _ = cv2.findContours(keep.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -269,7 +274,9 @@ def _crop_with_padding(image: Image.Image, box: tuple[int, int, int, int]) -> Im
 def pick_source(folder: pathlib.Path) -> tuple[pathlib.Path, Image.Image] | None:
     """Самое крупное фото в папке."""
     best = None
-    for path in list_photos(folder):
+    photos = list_photos(folder)
+    manual = [p for p in photos if p.stem.lower() in MANUAL_NAMES]
+    for path in manual or photos:
         image = open_image(path)
         if image is not None and (best is None or image.width * image.height > best[1].width * best[1].height):
             best = (path, image)
@@ -290,6 +297,7 @@ def write_preview(items: list[tuple[str, Image.Image, Image.Image | None]], targ
                 shown.thumbnail((cell - 8, cell - 8))
                 tile.paste(shown.convert("RGBA"), ((cell - shown.width) // 2, (cell - shown.height) // 2), shown.convert("RGBA"))
             sheet.paste(tile, (x + offset, y))
+        ImageDraw.Draw(sheet).text((x + 4, y + 3), f"{i + 1}. {items[i][0]}"[:34], fill=(20, 20, 20))
     sheet.save(target, "JPEG", quality=88)
 
 
