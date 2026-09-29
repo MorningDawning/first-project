@@ -45,7 +45,7 @@ ml/       — распознавание этикетки: дообучение 
 Node.js + Express + Prisma. База данных — PostgreSQL (`DATABASE_URL` в `server/.env`).
 Для разработки поднимите Postgres командой `docker compose up -d` в папке `server/`
 (см. `server/docker-compose.yml`) либо возьмите строку подключения к облачной базе.
-Как выложить сервер в интернет — в [DEPLOY.md](DEPLOY.md).
+Как выложить сервер в интернет: на российский хостинг — [deploy/VPS.md](deploy/VPS.md), на Render — [DEPLOY.md](DEPLOY.md).
 
 ```bash
 cd server
