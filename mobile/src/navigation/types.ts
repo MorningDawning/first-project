@@ -9,6 +9,7 @@ export type HomeStackParamList = {
   Home: undefined;
   Catalog: { style?: string; focusSearch?: boolean } | undefined;
   BeerDetail: { beerId: string };
+  AddBeer: { barcode?: string; name?: string } | undefined;
 };
 
 export type FeedStackParamList = {

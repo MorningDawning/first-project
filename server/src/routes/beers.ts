@@ -4,32 +4,25 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { computeUserTasteProfile, findSimilarBeers, matchPercent, tasteVector } from "../lib/taste";
 import { serializeBeer, serializeBeerDetail } from "../lib/serialize";
+import { fold } from "../lib/text";
+import { addBeerToCatalog } from "../lib/beerCatalog";
 
 export const beersRouter = Router();
 
 // GET /beers?q=search&style=IPA
+// Поиск делаем в коде, а не в базе: база не умеет сравнивать русские буквы без учёта регистра.
 beersRouter.get("/", requireAuth, async (req, res) => {
-  const q = (req.query.q as string | undefined)?.trim();
+  const q = fold((req.query.q as string | undefined) ?? "");
   const style = req.query.style as string | undefined;
 
-  const beers = await prisma.beer.findMany({
-    where: {
-      AND: [
-        q
-          ? {
-              OR: [
-                { name: { contains: q } },
-                { brewery: { name: { contains: q } } },
-                { style: { contains: q } },
-              ],
-            }
-          : {},
-        style ? { style } : {},
-      ],
-    },
+  const all = await prisma.beer.findMany({
+    where: style ? { style } : {},
     include: { brewery: true },
     orderBy: { name: "asc" },
   });
+  const beers = q
+    ? all.filter((b) => [b.name, b.brewery.name, b.style].some((field) => fold(field).includes(q)))
+    : all;
 
   const profile = await computeUserTasteProfile(req.userId!);
   const wishlisted = await prisma.wishlist.findMany({ where: { userId: req.userId! }, select: { beerId: true } });
@@ -47,6 +40,28 @@ beersRouter.get("/styles", requireAuth, async (_req, res) => {
   const groups = await prisma.beer.groupBy({ by: ["style"], _count: { style: true } });
   groups.sort((a, b) => b._count.style - a._count.style || a.style.localeCompare(b.style));
   res.json(groups.map((g) => g.style));
+});
+
+const newBeerSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  breweryName: z.string().trim().min(2).max(60),
+  style: z.string().trim().min(2).max(40),
+  abv: z.number().min(0).max(25),
+  barcode: z.string().regex(/^\d{6,14}$/).optional(),
+});
+
+// POST /beers — добавить пиво, которого нет в каталоге (например, после неудачного скана).
+// Если такое уже есть, вернёт существующее. Если пришёл штрихкод, пиво попадает и в бар пользователя.
+beersRouter.post("/", requireAuth, async (req, res) => {
+  const parsed = newBeerSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Проверьте название, пивоварню, стиль и крепость (0–25%)" });
+  }
+  const { beer, created } = await addBeerToCatalog({ ...parsed.data, abv: Math.round(parsed.data.abv * 10) / 10 });
+  if (parsed.data.barcode) {
+    await prisma.scanHistory.create({ data: { userId: req.userId!, beerId: beer.id } });
+  }
+  res.status(created ? 201 : 200).json({ id: beer.id, created });
 });
 
 beersRouter.get("/:id", requireAuth, async (req, res) => {

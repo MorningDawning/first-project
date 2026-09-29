@@ -45,6 +45,8 @@ export const beersApi = {
     api.get<BeerSummary[]>("/beers", { params }).then((r) => r.data),
   styles: () => api.get<string[]>("/beers/styles").then((r) => r.data),
   detail: (id: string) => api.get<BeerDetail>(`/beers/${id}`).then((r) => r.data),
+  add: (beer: { name: string; breweryName: string; style: string; abv: number; barcode?: string }) =>
+    api.post<{ id: string; created: boolean }>("/beers", beer).then((r) => r.data),
   review: (id: string, rating: number, text?: string, tags?: string[]) =>
     api.post(`/beers/${id}/reviews`, { rating, text, tags }).then((r) => r.data),
 };
@@ -56,6 +58,8 @@ export const wishlistApi = {
 };
 
 export const scanApi = {
+  /** Поиск по штрихкоду банки или бутылки. */
+  scanBarcode: (barcode: string) => api.post<BeerDetail>("/scan", { barcode }).then((r) => r.data),
   /** Uploads a captured label/can photo for recognition. */
   scan: (photoUri: string) => {
     const form = new FormData();

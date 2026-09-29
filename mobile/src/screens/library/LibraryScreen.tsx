@@ -104,7 +104,15 @@ export function LibraryScreen() {
       ) : error ? (
         <ErrorView message={error} onRetry={load} />
       ) : beers.length === 0 ? (
-        <EmptyView message="Ничего не найдено — попробуйте другой запрос" />
+        <View style={{ flex: 1 }}>
+          <EmptyView message="Ничего не найдено — попробуйте другой запрос" />
+          <Pressable
+            onPress={() => navigation.navigate("AddBeer", { name: query.trim() || undefined })}
+            style={styles.addBtn}
+          >
+            <Text style={styles.addBtnText}>Не нашли? Добавить пиво</Text>
+          </Pressable>
+        </View>
       ) : (
         <FlatList
           data={beers}
@@ -135,6 +143,8 @@ function pluralBeers(n: number): string {
 }
 
 const styles = StyleSheet.create({
+  addBtn: { alignSelf: "center", marginBottom: spacing.xl, backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: 14 },
+  addBtnText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.background },
   header: { padding: spacing.lg, paddingBottom: spacing.sm },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: spacing.md },
   backBtn: {

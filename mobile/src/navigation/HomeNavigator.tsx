@@ -4,6 +4,7 @@ import { HomeStackParamList } from "./types";
 import { HomeScreen } from "../screens/scan/HomeScreen";
 import { LibraryScreen } from "../screens/library/LibraryScreen";
 import { BeerDetailScreen } from "../screens/BeerDetailScreen";
+import { AddBeerScreen } from "../screens/scan/AddBeerScreen";
 import { colors } from "../theme/colors";
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -14,6 +15,7 @@ export function HomeNavigator() {
       <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Catalog" component={LibraryScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BeerDetail" component={BeerDetailScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AddBeer" component={AddBeerScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

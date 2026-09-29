@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { wrap } from "../lib/asyncHandler";
 import { computeUserTasteProfile, matchPercent } from "../lib/taste";
+import { fold } from "../lib/text";
 import {
   areFriends,
   compareTaste,
@@ -22,8 +23,6 @@ export const profilesRouter = Router();
 
 const SEARCH_LIMIT = 20;
 
-// SQLite сравнивает без учёта регистра только латиницу, поэтому имена приводим к нижнему регистру сами.
-const fold = (text: string) => text.toLowerCase().replace(/ё/g, "е");
 
 // GET /users/search?q= — люди по имени или @нику. «@ник» ищет только среди ников.
 profilesRouter.get("/search", requireAuth, wrap(async (req, res) => {

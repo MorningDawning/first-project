@@ -5,26 +5,42 @@ import { requireAuth } from "../middleware/auth";
 import { computeUserTasteProfile, findSimilarBeers, matchPercent, tasteVector } from "../lib/taste";
 import { serializeBeerDetail } from "../lib/serialize";
 import { recognizeLabel } from "../lib/mlRecognition";
+import { lookupBarcode } from "../lib/openFoodFacts";
+import { addBeerToCatalog } from "../lib/beerCatalog";
 
 export const scanRouter = Router();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 /**
- * Recognizes a scanned beer label/can.
- *
- * Primary path: the uploaded photo goes to the CLIP recognition service
- * (see /ml — a linear-probe classifier fine-tuned on top of CLIP embeddings)
- * and we look up the match by name in our own database. Until a checkpoint
- * is trained on real photos (or if ML_SERVICE_URL isn't configured, or the
- * service is unreachable), falls back to a barcode lookup or a pseudo-random
- * pick, so the rest of the app — and manual testing — keeps working
- * end-to-end while the dataset is still being collected.
+ * Распознаёт отсканированное пиво. Порядок: штрихкод (наша база, затем Open Food Facts) →
+ * фото этикетки через ML-сервис (см. /ml). Если ничего не нашли, честно отвечаем 404 с кодом
+ * NOT_RECOGNIZED: приложение предложит найти пиво вручную или добавить его.
+ * Для демонстрации без обученной модели можно включить SCAN_DEMO_MODE=1 — тогда вместо отказа
+ * выдаётся случайное пиво из базы (на боевом сервере не включать).
  */
 scanRouter.post("/", requireAuth, upload.single("photo"), async (req, res) => {
-  const barcode = req.body?.barcode as string | undefined;
+  const barcode = typeof req.body?.barcode === "string" ? req.body.barcode.trim() : undefined;
 
   let beer = barcode ? await prisma.beer.findUnique({ where: { barcode } }) : null;
+
+  if (!beer && barcode) {
+    const product = await lookupBarcode(barcode);
+    if (product) {
+      beer = (
+        await addBeerToCatalog({
+          name: product.name,
+          breweryName: product.brand ?? "Не указана",
+          country: product.country,
+          style: product.style,
+          abv: product.abv ?? 5,
+          barcode,
+          imageUrl: product.imageUrl,
+          description: `${product.style}. Данные по штрихкоду из Open Food Facts${product.abv ? "" : "; крепость указана приблизительно"}. Вкус указан приблизительно, по типичному для стиля.`,
+        })
+      ).beer;
+    }
+  }
 
   if (!beer && req.file) {
     const candidate = await recognizeLabel(req.file.buffer);
@@ -33,14 +49,18 @@ scanRouter.post("/", requireAuth, upload.single("photo"), async (req, res) => {
     }
   }
 
-  if (!beer) {
+  if (!beer && process.env.SCAN_DEMO_MODE === "1") {
     const count = await prisma.beer.count();
-    if (count === 0) return res.status(404).json({ error: "База пива пуста" });
-    const skip = Math.floor(Math.random() * count);
-    beer = await prisma.beer.findFirst({ skip });
+    if (count > 0) beer = await prisma.beer.findFirst({ skip: Math.floor(Math.random() * count) });
   }
 
-  if (!beer) return res.status(404).json({ error: "Не удалось распознать пиво" });
+  if (!beer) {
+    return res.status(404).json({
+      error: barcode ? "Этого пива пока нет в базе" : "Не удалось распознать пиво по фото",
+      code: "NOT_RECOGNIZED",
+      barcode: barcode ?? null,
+    });
+  }
 
   await prisma.scanHistory.create({ data: { userId: req.userId!, beerId: beer.id } });
 

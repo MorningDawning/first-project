@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import axios from "axios";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -15,6 +16,11 @@ import { BeerDetail } from "../../types";
 
 type Nav = BottomTabNavigationProp<MainTabParamList, "CameraTab">;
 
+/** Сервер ответил «такого пива нет» (а не «что-то сломалось»). */
+function isNotRecognized(e: unknown): boolean {
+  return axios.isAxiosError(e) && e.response?.data?.code === "NOT_RECOGNIZED";
+}
+
 export function CameraScanScreen() {
   const navigation = useNavigation<Nav>();
   const isFocused = useIsFocused();
@@ -24,6 +30,9 @@ export function CameraScanScreen() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [found, setFound] = useState<BeerDetail | null>(null);
+  // Пиво не нашли: показываем предложение найти вручную или добавить (barcode — если сканировали штрихкод).
+  const [notFound, setNotFound] = useState<{ barcode: string | null } | null>(null);
+  const lastBarcode = useRef<{ code: string; at: number } | null>(null);
   // Останавливаем рендер CameraView сразу после съёмки/выбора фото, не дожидаясь
   // навигации — иначе нативная камера-сессия иногда остаётся «висеть» в фоне
   // (iOS показывает системную плашку «вернуться к камере» поверх других экранов).
@@ -31,7 +40,7 @@ export function CameraScanScreen() {
   // остаётся смонтированной при переходе на другие вкладки, так что без этого
   // объектив продолжал бы работать в фоне.
   const [cameraActive, setCameraActive] = useState(true);
-  const cameraVisible = cameraActive && isFocused && !found;
+  const cameraVisible = cameraActive && isFocused && !found && !notFound;
 
   async function submitPhoto(uri: string) {
     setError(null);
@@ -42,8 +51,29 @@ export function CameraScanScreen() {
       // карточку пива только по явному тапу «Открыть».
       setFound(beer);
     } catch (e) {
-      setError(apiErrorMessage(e, "Не удалось распознать пиво"));
-      setCameraActive(true);
+      if (isNotRecognized(e)) setNotFound({ barcode: null });
+      else {
+        setError(apiErrorMessage(e, "Не удалось распознать пиво"));
+        setCameraActive(true);
+      }
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  // Штрихкод камера ловит сама, без нажатия на кнопку. Один и тот же код не обрабатываем чаще раза в 3 секунды.
+  async function onBarcode(code: string) {
+    if (scanning || found || notFound) return;
+    const last = lastBarcode.current;
+    if (last && last.code === code && Date.now() - last.at < 3_000) return;
+    lastBarcode.current = { code, at: Date.now() };
+    setError(null);
+    setScanning(true);
+    try {
+      setFound(await scanApi.scanBarcode(code));
+    } catch (e) {
+      if (isNotRecognized(e)) setNotFound({ barcode: code });
+      else setError(apiErrorMessage(e, "Не удалось найти пиво по штрихкоду"));
     } finally {
       setScanning(false);
     }
@@ -61,8 +91,20 @@ export function CameraScanScreen() {
 
   function scanAgain() {
     setFound(null);
+    setNotFound(null);
     setError(null);
     setCameraActive(true);
+  }
+
+  function addBeer() {
+    const barcode = notFound?.barcode ?? undefined;
+    scanAgain();
+    navigation.navigate("HomeTab", { screen: "AddBeer", params: { barcode } });
+  }
+
+  function searchCatalog() {
+    scanAgain();
+    navigation.navigate("HomeTab", { screen: "Catalog", params: { focusSearch: true } });
   }
 
   async function handleCapture() {
@@ -92,13 +134,20 @@ export function CameraScanScreen() {
   return (
     <View style={styles.root}>
       {permission?.granted && cameraVisible && (
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} />
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          enableTorch={torch}
+          barcodeScannerSettings={{ barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e"] }}
+          onBarcodeScanned={scanning ? undefined : (result) => onBarcode(result.data)}
+        />
       )}
 
       <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
         <View style={styles.topBar}>
           <RoundIconButton icon="✕" onPress={() => navigation.navigate("HomeTab", { screen: "Home" })} />
-          {permission?.granted && !found && (
+          {permission?.granted && !found && !notFound && (
             <RoundIconButton icon={torch ? "⚡️" : "⚡"} active={torch} onPress={() => setTorch((t) => !t)} />
           )}
         </View>
@@ -109,7 +158,8 @@ export function CameraScanScreen() {
             <Button title="Разрешить доступ" variant="light" onPress={requestPermission} />
           </View>
         ) : (
-          !found && (
+          !found &&
+          !notFound && (
             <View style={styles.viewfinderWrap} pointerEvents="none">
               <View style={styles.viewfinder}>
                 <View style={[styles.corner, styles.cornerTL]} />
@@ -121,7 +171,23 @@ export function CameraScanScreen() {
           )
         )}
 
-        {found ? (
+        {notFound ? (
+          <View style={styles.bottomArea}>
+            <View style={styles.notFoundCard}>
+              <Text style={styles.notFoundTitle}>Не нашли это пиво</Text>
+              <Text style={styles.notFoundText}>
+                {notFound.barcode
+                  ? `Штрихкода ${notFound.barcode} пока нет в базе. Найдите пиво вручную или добавьте его: в следующий раз скан узнает эту банку.`
+                  : "По фото не удалось узнать этикетку. Попробуйте навести камеру на штрихкод, найти пиво вручную или добавить его."}
+              </Text>
+              <Button title="Добавить пиво" onPress={addBeer} />
+              <Button title="Найти в каталоге" variant="outline" onPress={searchCatalog} />
+            </View>
+            <Pressable onPress={scanAgain} hitSlop={8}>
+              <Text style={styles.scanAgain}>Сканировать ещё раз</Text>
+            </Pressable>
+          </View>
+        ) : found ? (
           <View style={styles.bottomArea}>
             <Pressable onPress={openFound} style={styles.foundCard}>
               <MatchRing percent={found.matchPercent ?? 0} size={52} strokeWidth={5}>
@@ -143,7 +209,7 @@ export function CameraScanScreen() {
           <View style={styles.bottomArea}>
             <View style={[styles.hintPill, error && styles.hintPillError]}>
               <Text style={styles.hintText}>
-                {error ?? (scanning ? "Распознаём этикетку…" : "Держите банку ровно в кадре")}
+                {error ?? (scanning ? "Ищем пиво…" : "Наведите на штрихкод или сфотографируйте этикетку")}
               </Text>
             </View>
 
@@ -285,6 +351,17 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.primary,
   },
+
+  notFoundCard: {
+    marginHorizontal: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    gap: spacing.sm + 2,
+    alignSelf: "stretch",
+  },
+  notFoundTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.text },
+  notFoundText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.textMuted },
 
   foundCard: {
     marginHorizontal: spacing.md,

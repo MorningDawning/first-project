@@ -15,8 +15,8 @@ type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 export function LoginScreen({ navigation }: Props) {
   const kb = useKeyboardAvoidance();
   const { login } = useAuth();
-  const [email, setEmail] = useState("demo@beervia.app");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -63,7 +63,6 @@ export function LoginScreen({ navigation }: Props) {
             onPress={() => navigation.navigate("Register")}
             style={{ marginTop: spacing.sm }}
           />
-          <Text style={styles.hint}>Демо-доступ уже подставлен — просто нажмите «Войти».</Text>
         </View>
       </ScrollView>
       </Animated.View>
