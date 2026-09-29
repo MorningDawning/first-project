@@ -13,14 +13,17 @@
   grabcut    алгоритм OpenCV: выделяет предмет в центре кадра на любом фоне, без скачивания моделей.
              Часто срезает горлышки и края, на проверке с настоящими фото получилось плохо. Только если
              хотите попробовать сами; в auto он не используется.
-  birefnet   (экспериментально) нейросеть BiRefNet с Hugging Face (лицензия MIT): лучшее качество из доступных,
-             но тяжёлая. Нужно: pip install -r requirements-cutout.txt. Медленно на процессоре: 10–30 секунд
-             на фото. Первый запуск скачивает модель.
+  birefnet   нейросеть BiRefNet с Hugging Face (лицензия MIT): лучшее качество из доступных, вырезает любой
+             фон и убирает тень. Нужно: pip install -r requirements-cutout.txt. На процессоре 10–30 секунд
+             на фото. Первый запуск скачивает модель (несколько сотен МБ, может понадобиться VPN).
   rembg      нейросеть вырезает любой фон и убирает тень. Установка: pip install "rembg[cpu]", при первом
              запуске скачивается модель (около 170 МБ, может понадобиться VPN). На самых новых версиях
              Python может не ставиться.
-  auto       (по умолчанию) rembg, если он установлен; иначе только floodfill. Если вырезка не получается
-             чисто, лучше оставить целое фото упаковки, чем показывать обрубок.
+  auto       (по умолчанию) birefnet, если установлен; иначе rembg; иначе только floodfill. Если вырезка
+             не получается чисто, лучше оставить целое фото упаковки, чем показывать обрубок.
+
+С флагом --preview рядом с датасетом сохраняется картинка cutout-preview.jpg: слева оригиналы, справа то, что
+получилось, на цветном фоне. Так сразу видно, где вырезка удалась, а где нет.
 """
 
 from __future__ import annotations
@@ -105,14 +108,6 @@ def cutout_floodfill(image: Image.Image) -> tuple[Image.Image | None, str]:
     return _crop_with_padding(result, box), "ok"
 
 
-def cutout_rembg(image: Image.Image) -> tuple[Image.Image | None, str]:
-    from rembg import remove  # type: ignore
-
-    result = remove(image.convert("RGB"))
-    box = result.getchannel("A").getbbox()
-    return (_crop_with_padding(result, box), "ok") if box else (None, "ничего не осталось")
-
-
 def cutout_grabcut(image: Image.Image) -> tuple[Image.Image | None, str]:
     """Вырезка алгоритмом GrabCut (OpenCV): предмет в центре кадра, любой фон, без нейросети."""
     try:
@@ -164,35 +159,33 @@ def cutout_grabcut(image: Image.Image) -> tuple[Image.Image | None, str]:
     return _crop_with_padding(result, box), "ok"
 
 
-_BIREFNET: dict = {}
+def finish_from_alpha(rgb: Image.Image, alpha: Image.Image) -> tuple[Image.Image | None, str]:
+    """Общая доводка для нейросетевых режимов: чистим маску, проверяем и обрезаем по предмету.
 
-
-def cutout_birefnet(image: Image.Image) -> tuple[Image.Image | None, str]:
-    """Вырезка нейросетью BiRefNet (Hugging Face, MIT). Экспериментальный режим."""
+    alpha — полутоновая маска (0 — фон, 255 — предмет) того же размера, что и rgb.
+    """
+    solid = np.asarray(alpha) > 127
+    if not solid.any():
+        return None, "ничего не осталось"
+    # Оставляем самую крупную область: мелкие «острова» (надписи на фоне, тени) — не часть упаковки.
     try:
-        import torch
-        from torchvision import transforms
-        from transformers import AutoModelForImageSegmentation
+        import cv2
+
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(solid.astype(np.uint8), connectivity=8)
+        if count > 1:
+            biggest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+            keep = labels == biggest
+            contours, _ = cv2.findContours(keep.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            filled = np.zeros(keep.shape, np.uint8)
+            cv2.drawContours(filled, contours, -1, 1, thickness=cv2.FILLED)  # закрываем дырки внутри
+            keep = filled.astype(bool)
+            alpha = Image.fromarray(np.where(keep & ~solid, 255, np.asarray(alpha) * keep).astype(np.uint8), "L")
+            solid = keep
     except ImportError:
-        return None, "не установлено (pip install -r requirements-cutout.txt)"
-
-    if "model" not in _BIREFNET:
-        print("Загружаем BiRefNet (первый раз скачивается около 200–900 МБ)...")
-        model = AutoModelForImageSegmentation.from_pretrained("ZhengPeng7/BiRefNet_lite", trust_remote_code=True)
-        _BIREFNET["model"] = model.eval()
-    model = _BIREFNET["model"]
-
-    rgb = image.convert("RGB")
-    prepare = transforms.Compose(
-        [
-            transforms.Resize((768, 768)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ]
-    )
-    with torch.no_grad():
-        prediction = model(prepare(rgb).unsqueeze(0))[-1].sigmoid().cpu()[0].squeeze()
-    alpha = transforms.ToPILImage()(prediction).resize(rgb.size, Image.LANCZOS)
+        pass
+    fill = solid.mean()
+    if not (MIN_FILL <= fill <= MAX_FILL):
+        return None, f"предмет занимает {fill:.0%} кадра — вырезка ненадёжна"
     box = alpha.point(lambda v: 255 if v > 127 else 0).getbbox()
     if box is None:
         return None, "ничего не осталось"
@@ -201,9 +194,69 @@ def cutout_birefnet(image: Image.Image) -> tuple[Image.Image | None, str]:
     return _crop_with_padding(result, box), "ok"
 
 
+_BIREFNET: dict = {}
+BIREFNET_SIZE = 1024
+
+
+def birefnet_available() -> bool:
+    try:
+        import einops, kornia, timm, torch, torchvision, transformers  # noqa: F401, E401
+    except ImportError:
+        return False
+    return True
+
+
+def cutout_birefnet(image: Image.Image) -> tuple[Image.Image | None, str]:
+    """Вырезка нейросетью BiRefNet (Hugging Face, лицензия MIT): аккуратные края, убирает тень."""
+    if not birefnet_available():
+        return None, "не установлено (pip install -r requirements-cutout.txt)"
+    import torch
+    from torchvision import transforms
+    from transformers import AutoModelForImageSegmentation
+
+    if "model" not in _BIREFNET:
+        print("Загружаем BiRefNet (первый раз скачивается несколько сотен мегабайт)...")
+        try:
+            model = AutoModelForImageSegmentation.from_pretrained(
+                "ZhengPeng7/BiRefNet_lite", trust_remote_code=True, low_cpu_mem_usage=False
+            )
+        except TypeError:
+            model = AutoModelForImageSegmentation.from_pretrained("ZhengPeng7/BiRefNet_lite", trust_remote_code=True)
+        _BIREFNET["model"] = model.eval()
+    model = _BIREFNET["model"]
+
+    rgb = image.convert("RGB")
+    prepare = transforms.Compose(
+        [
+            transforms.Resize((BIREFNET_SIZE, BIREFNET_SIZE)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ]
+    )
+    with torch.no_grad():
+        prediction = model(prepare(rgb).unsqueeze(0))[-1].sigmoid().cpu()[0].squeeze()
+    alpha = transforms.ToPILImage()(prediction).resize(rgb.size, Image.LANCZOS)
+    return finish_from_alpha(rgb, alpha)
+
+
+def cutout_rembg(image: Image.Image) -> tuple[Image.Image | None, str]:
+    from rembg import remove  # type: ignore
+
+    rgb = image.convert("RGB")
+    return finish_from_alpha(rgb, remove(rgb).getchannel("A"))
+
+
 def cutout_auto(image: Image.Image) -> tuple[Image.Image | None, str]:
-    """Вырезаем только по однородному фону: там результат чистый. Иначе лучше показать целое фото."""
-    return cutout_floodfill(image)
+    """Самое качественное из доступного. Без нейросети вырезаем только по однородному фону: там результат
+    чистый; иначе лучше показать целое фото, чем обрубок."""
+    if birefnet_available():
+        return cutout_birefnet(image)
+    try:
+        import rembg  # noqa: F401
+
+        return cutout_rembg(image)
+    except ImportError:
+        return cutout_floodfill(image)
 
 
 def _crop_with_padding(image: Image.Image, box: tuple[int, int, int, int]) -> Image.Image:
@@ -223,22 +276,46 @@ def pick_source(folder: pathlib.Path) -> tuple[pathlib.Path, Image.Image] | None
     return best
 
 
+def write_preview(items: list[tuple[str, Image.Image, Image.Image | None]], target: pathlib.Path, cell: int = 220) -> None:
+    """Контактный лист: оригинал и вырезка на цветном фоне (на светлом «пропавший» фон был бы не виден)."""
+    columns = 4
+    rows = (len(items) + columns - 1) // columns
+    sheet = Image.new("RGB", (columns * cell * 2, rows * cell), (40, 44, 52))
+    for i, (_, original, cut) in enumerate(items):
+        x, y = (i % columns) * cell * 2, (i // columns) * cell
+        for offset, picture in ((0, original), (cell, cut)):
+            tile = Image.new("RGB", (cell, cell), (66, 135, 200) if offset else (255, 255, 255))
+            if picture is not None:
+                shown = picture.copy()
+                shown.thumbnail((cell - 8, cell - 8))
+                tile.paste(shown.convert("RGBA"), ((cell - shown.width) // 2, (cell - shown.height) // 2), shown.convert("RGBA"))
+            sheet.paste(tile, (x + offset, y))
+    sheet.save(target, "JPEG", quality=88)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data", default="dataset")
     parser.add_argument("--mode", default="auto", choices=["auto", "floodfill", "grabcut", "rembg", "birefnet"])
     parser.add_argument("--only", help="Только эта папка")
     parser.add_argument("--force", action="store_true", help="Переделать, даже если cutout.png уже есть")
+    parser.add_argument("--preview", action="store_true", help="Сохранить cutout-preview.jpg: оригиналы и вырезки рядом")
+    parser.add_argument("--preview-count", type=int, default=24, help="Сколько пар показать в превью")
     args = parser.parse_args()
 
     mode = args.mode
     if mode == "auto":
-        try:
-            import rembg  # noqa: F401
+        if birefnet_available():
+            mode = "birefnet"
+        else:
+            try:
+                import rembg  # noqa: F401
 
-            mode = "rembg"
-        except ImportError:
-            pass
+                mode = "rembg"
+            except ImportError:
+                mode = "floodfill"
+                print("Нейросеть не установлена: вырезаем только на однородном фоне. Для настоящей вырезки:")
+                print("  pip install -r requirements-cutout.txt")
     make = {
         "rembg": cutout_rembg,
         "floodfill": cutout_floodfill,
@@ -251,6 +328,7 @@ def main() -> None:
     done = existing = 0
     failed: list[tuple[str, str]] = []
     no_photo: list[str] = []
+    preview: list[tuple[str, Image.Image, Image.Image | None]] = []
     for slug in load_labels(data_dir):
         if args.only and slug != args.only:
             continue
@@ -264,6 +342,8 @@ def main() -> None:
             no_photo.append(slug)
             continue
         result, note = make(source[1])
+        if args.preview and len(preview) < args.preview_count:
+            preview.append((slug, source[1], result))
         if result is None:
             failed.append((slug, note))
             if args.force and target.exists():
@@ -278,6 +358,10 @@ def main() -> None:
         print(f"  не удалось: {slug} — {note}")
     if len(failed) > 30:
         print(f"  … и ещё {len(failed) - 30}")
+    if args.preview and preview:
+        target_preview = pathlib.Path("cutout-preview.jpg")
+        write_preview(preview, target_preview)
+        print(f"Превью: {target_preview.resolve()}")
     print("Дальше: в папке server выполните npm run sync-photos:local")
 
 

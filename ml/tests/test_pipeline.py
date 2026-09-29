@@ -278,3 +278,38 @@ def test_grabcut_cuts_object_on_busy_background():
     alpha = np.asarray(result.getchannel("A"))
     assert alpha[alpha.shape[0] // 2, alpha.shape[1] // 2] == 255
     assert alpha[0, 0] == 0
+
+
+def test_finish_from_alpha_keeps_biggest_blob_and_fills_holes():
+    pytest.importorskip("cv2")
+    from make_cutouts import finish_from_alpha
+
+    rgb = _can_on((120, 160, 200))
+    mask = Image.new("L", rgb.size, 0)
+    d = ImageDraw.Draw(mask)
+    d.rounded_rectangle([90, 60, 210, 340], radius=14, fill=255)  # банка
+    d.rectangle([120, 150, 180, 230], fill=0)                     # дырка внутри (ошибка модели)
+    d.rectangle([5, 5, 30, 30], fill=255)                         # мусорный островок в углу
+    result, note = finish_from_alpha(rgb, mask)
+    assert note == "ok" and result.mode == "RGBA"
+    assert result.width < 160 and result.height < 320             # остров не растянул рамку
+    alpha = np.asarray(result.getchannel("A"))
+    assert alpha[alpha.shape[0] // 2, alpha.shape[1] // 2] == 255  # дырка закрыта
+
+
+def test_finish_from_alpha_rejects_empty_and_full_masks():
+    from make_cutouts import finish_from_alpha
+
+    rgb = _can_on((250, 250, 250))
+    assert finish_from_alpha(rgb, Image.new("L", rgb.size, 0))[0] is None
+    assert finish_from_alpha(rgb, Image.new("L", rgb.size, 255))[0] is None
+
+
+def test_write_preview_sheet(tmp_path):
+    from make_cutouts import cutout_floodfill, write_preview
+
+    original = _can_on((255, 255, 255))
+    cut, _ = cutout_floodfill(original)
+    out = tmp_path / "preview.jpg"
+    write_preview([("a", original, cut), ("b", original, None)], out)
+    assert Image.open(out).width > 0
