@@ -32,7 +32,7 @@ export function ChatScreen({ route, navigation }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  const lastCount = useRef(0);
+  const nearBottom = useRef(true);
 
   const load = useCallback(async () => {
     try {
@@ -58,13 +58,7 @@ export function ChatScreen({ route, navigation }: Props) {
     return () => clearInterval(timer);
   }, [focused, load]);
 
-  const count = thread?.messages.length ?? 0;
-  useEffect(() => {
-    if (count !== lastCount.current) {
-      lastCount.current = count;
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: count > 0 }), 50);
-    }
-  }, [count]);
+  const scrollToBottom = useCallback(() => listRef.current?.scrollToEnd({ animated: false }), []);
 
   async function send(body: { text?: string; beerId?: string }) {
     if (sending) return;
@@ -117,6 +111,16 @@ export function ChatScreen({ route, navigation }: Props) {
       <Animated.View ref={kb.ref} collapsable={false} style={[{ flex: 1 }, kb.style]}>
         <FlatList
           ref={listRef}
+          // Новое сообщение прокручивает вниз, только если читатель и так был внизу;
+          // а когда список сжимается или растягивается под клавиатуру — всегда, чтобы
+          // последнее сообщение оставалось перед глазами.
+          onContentSizeChange={() => nearBottom.current && scrollToBottom()}
+          onLayout={scrollToBottom}
+          onScroll={(e) => {
+            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+            nearBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
+          }}
+          scrollEventThrottle={100}
           data={messages}
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.list}
