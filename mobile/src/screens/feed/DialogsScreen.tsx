@@ -126,7 +126,11 @@ export function DialogsScreen() {
             const last = item.lastMessage;
             const typingNow = typing[item.id];
             const preview = last
-              ? last.text ?? (last.beerName ? `Пиво: ${last.beerName}` : last.hasPhoto ? "Фото" : "")
+              ? last.deleted
+                ? "Сообщение удалено"
+                : last.hasAudio
+                  ? "Голосовое сообщение"
+                  : last.text ?? (last.beerName ? `Пиво: ${last.beerName}` : last.hasPhoto ? "Фото" : "")
               : "";
             const prefix = last?.fromMe ? "Вы: " : last?.senderName ? `${last.senderName}: ` : "";
             const typingText = typingNow ? (item.type === "group" ? `${typingNow.name.split(" ")[0]} печатает…` : "печатает…") : null;

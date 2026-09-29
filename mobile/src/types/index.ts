@@ -92,10 +92,13 @@ export type FeedPost = {
 
 export type PostComment = {
   id: string;
+  /** Пустая строка, если в комментарии только фото или пиво. */
   text: string;
   createdAt: string;
   parentId: string | null;
   user: UserBrief;
+  photo: { url: string; width: number | null; height: number | null } | null;
+  beer: PostBeer | null;
   likeCount: number;
   likedByMe: boolean;
   canDelete: boolean;
@@ -150,10 +153,23 @@ export type ChatSummary = {
     text: string | null;
     beerName: string | null;
     hasPhoto: boolean;
+    hasAudio: boolean;
+    deleted: boolean;
     senderName: string | null;
     fromMe: boolean;
     createdAt: string;
   } | null;
+};
+
+/** Цитата исходного сообщения внутри ответа. */
+export type MessageQuote = {
+  id: string;
+  senderName: string;
+  fromMe: boolean;
+  deleted: boolean;
+  text: string | null;
+  kind: "text" | "photo" | "beer" | "voice" | "deleted";
+  beerName: string | null;
 };
 
 export type ChatMessage = {
@@ -163,6 +179,11 @@ export type ChatMessage = {
   fromMe: boolean;
   createdAt: string;
   sender: UserBrief;
+  /** Удалено у всех: остаётся серая заглушка. */
+  deleted: boolean;
+  editedAt: string | null;
+  replyTo: MessageQuote | null;
+  audio: { url: string; durationMs: number } | null;
   photo: { url: string; width: number | null; height: number | null } | null;
   beer: {
     id: string;

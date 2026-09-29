@@ -1,18 +1,24 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "../../components/Screen";
+import { AttachSheet } from "../../components/AttachSheet";
 import { Avatar } from "../../components/Avatar";
+import { BeerArt } from "../../components/BeerArt";
+import { BeerPicker, PickedBeer } from "../../components/BeerPicker";
+import { ImageViewer } from "../../components/ImageViewer";
 import { BackButton } from "../../components/BackButton";
 import { FriendActionButton } from "../../components/FriendActionButton";
 import { CommentPill, LikePill, PostBeerChip, PostPhotos } from "../../components/PostCard";
 import { Icon } from "../../components/icons/Icon";
 import { ErrorView, LoadingView } from "../../components/StateViews";
 import { useAuth } from "../../context/AuthContext";
-import { commentsApi, postsApi } from "../../api/beervia";
+import { commentsApi, postsApi, uploadsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
+import { resolveMediaUrl } from "../../api/config";
+import { PickedImage, pickImage } from "../../lib/pickImage";
 import { plural, timeAgo } from "../../lib/time";
 import { useKeyboardAvoidance } from "../../lib/useKeyboardAvoidance";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
@@ -20,6 +26,20 @@ import { FeedStackParamList } from "../../navigation/types";
 import { FeedPost, FriendStatus, PostComment } from "../../types";
 
 type Props = NativeStackScreenProps<FeedStackParamList, "PostDetail">;
+
+function commentPhotoSize(width: number | null, height: number | null) {
+  const MAX_W = 230;
+  const MAX_H = 280;
+  if (!width || !height) return { width: MAX_W, height: MAX_W };
+  const ratio = width / height;
+  let w = MAX_W;
+  let h = w / ratio;
+  if (h > MAX_H) {
+    h = MAX_H;
+    w = h * ratio;
+  }
+  return { width: Math.max(120, w), height: Math.max(120, h) };
+}
 
 export function PostDetailScreen({ route, navigation }: Props) {
   const { postId } = route.params;
@@ -34,6 +54,11 @@ export function PostDetailScreen({ route, navigation }: Props) {
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<PostComment | null>(null);
   const [sending, setSending] = useState(false);
+  const [photoAtt, setPhotoAtt] = useState<PickedImage | null>(null);
+  const [beerAtt, setBeerAtt] = useState<PickedBeer | null>(null);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [beerPickerOpen, setBeerPickerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const listRef = useRef<FlatList<PostComment>>(null);
   const nearBottom = useRef(false);
   const contentHeight = useRef(0);
@@ -126,14 +151,39 @@ export function PostDetailScreen({ route, navigation }: Props) {
     if (c.parentId && !text) setText(`${c.user.name.split(" ")[0]}, `);
   }
 
+  const attachOptions = useMemo(
+    () => [
+      { key: "beer", label: "Пиво", icon: "scan" as const, onPress: () => setBeerPickerOpen(true) },
+      { key: "library", label: "Фото из галереи", icon: "image" as const, onPress: () => pickPhoto("library") },
+      { key: "camera", label: "Сделать фото", icon: "camera" as const, onPress: () => pickPhoto("camera") },
+    ],
+    []
+  );
+
+  async function pickPhoto(source: "library" | "camera") {
+    const picked = await pickImage(source);
+    if (picked) setPhotoAtt(picked);
+  }
+
+  const canSend = text.trim().length > 0 || photoAtt !== null || beerAtt !== null;
+
   async function send() {
     const body = text.trim();
-    if (!body || sending || !post) return;
+    if (!canSend || sending || !post) return;
     setSending(true);
     try {
-      const created = await postsApi.addComment(post.id, body, replyTo ? replyTo.parentId ?? replyTo.id : undefined);
+      // Фото загружаем в момент отправки: пока комментарий не ушёл, его можно передумать.
+      const photoUrl = photoAtt ? await uploadsApi.photo(photoAtt.uri) : null;
+      const created = await postsApi.addComment(post.id, {
+        text: body || undefined,
+        parentId: replyTo ? replyTo.parentId ?? replyTo.id : undefined,
+        beerId: beerAtt?.id,
+        photo: photoUrl && photoAtt ? { url: photoUrl, width: photoAtt.width, height: photoAtt.height } : undefined,
+      });
       setText("");
       setReplyTo(null);
+      setPhotoAtt(null);
+      setBeerAtt(null);
       pendingScrollId.current = created.id;
       await load();
     } catch (e) {
@@ -267,7 +317,15 @@ export function PostDetailScreen({ route, navigation }: Props) {
                 <Text style={styles.commentName}>
                   {item.user.name} <Text style={styles.commentTime}>· {timeAgo(item.createdAt)}</Text>
                 </Text>
-                <Text style={styles.commentText}>{item.text}</Text>
+                {item.text ? <Text style={styles.commentText}>{item.text}</Text> : null}
+                {item.photo && (
+                  <Pressable onPress={() => setViewerUrl(item.photo!.url)} style={[styles.commentPhoto, commentPhotoSize(item.photo.width, item.photo.height)]}>
+                    <Image source={{ uri: resolveMediaUrl(item.photo.url) ?? undefined }} style={StyleSheet.absoluteFill} />
+                  </Pressable>
+                )}
+                {item.beer && (
+                  <PostBeerChip beer={item.beer} rating={null} onPress={() => navigation.navigate("BeerDetail", { beerId: item.beer!.id })} />
+                )}
                 <View style={styles.commentActions}>
                   <Pressable onPress={() => toggleCommentLike(item)} hitSlop={6} style={styles.commentAction}>
                     <Icon name="heart" color={item.likedByMe ? colors.primary : colors.textMuted} size={14} filled={item.likedByMe} />
@@ -296,6 +354,30 @@ export function PostDetailScreen({ route, navigation }: Props) {
               </Pressable>
             </View>
           )}
+          {(photoAtt || beerAtt) && (
+            <View style={styles.attachRow}>
+              {photoAtt && (
+                <View style={styles.attachThumb}>
+                  <Image source={{ uri: photoAtt.uri }} style={StyleSheet.absoluteFill} />
+                  <Pressable onPress={() => setPhotoAtt(null)} hitSlop={6} style={styles.attachRemove}>
+                    <Icon name="close" color="#fff" size={12} strokeWidth={3} />
+                  </Pressable>
+                </View>
+              )}
+              {beerAtt && (
+                <View style={styles.attachBeer}>
+                  <BeerArt name={beerAtt.name} imageUrl={beerAtt.imageUrl} size={38} />
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={styles.attachBeerName} numberOfLines={1}>{beerAtt.name}</Text>
+                    <Text style={styles.attachBeerSub} numberOfLines={1}>{beerAtt.brewery.name}</Text>
+                  </View>
+                  <Pressable onPress={() => setBeerAtt(null)} hitSlop={8}>
+                    <Icon name="close" color={colors.textMuted} size={16} strokeWidth={2.75} />
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          )}
           <View style={styles.composerRow}>
             {me && <Avatar user={me} size={38} me />}
             <TextInput
@@ -307,16 +389,34 @@ export function PostDetailScreen({ route, navigation }: Props) {
               maxLength={500}
               multiline
             />
+            <Pressable onPress={() => setAttachOpen(true)} style={styles.attachBtn} hitSlop={6}>
+              <Icon name="plus" color="#474238" size={20} strokeWidth={2.75} />
+            </Pressable>
             <Pressable
               onPress={send}
-              disabled={!text.trim() || sending}
-              style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.45 }]}
+              disabled={!canSend || sending}
+              style={[styles.sendBtn, (!canSend || sending) && { opacity: 0.45 }]}
             >
-              <Icon name="arrowUp" color={colors.background} size={20} strokeWidth={2.75} />
+              {sending ? (
+                <ActivityIndicator color={colors.background} size="small" />
+              ) : (
+                <Icon name="arrowUp" color={colors.background} size={20} strokeWidth={2.75} />
+              )}
             </Pressable>
           </View>
         </View>
       </Animated.View>
+
+      <AttachSheet visible={attachOpen} options={attachOptions} onClose={() => setAttachOpen(false)} />
+      <BeerPicker
+        visible={beerPickerOpen}
+        onClose={() => setBeerPickerOpen(false)}
+        onPick={(beer) => {
+          setBeerPickerOpen(false);
+          setBeerAtt(beer);
+        }}
+      />
+      <ImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />
     </Screen>
   );
 }
@@ -343,6 +443,7 @@ const styles = StyleSheet.create({
   commentName: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.text },
   commentTime: { fontFamily: fonts.body, color: colors.textMuted },
   commentText: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.text },
+  commentPhoto: { borderRadius: 16, overflow: "hidden", backgroundColor: colors.border, marginTop: 2 },
   commentActions: { flexDirection: "row", gap: 16, paddingTop: 2 },
   commentAction: { flexDirection: "row", alignItems: "center", gap: 4 },
   commentActionText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.textMuted },
@@ -366,5 +467,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
+  attachRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  attachThumb: { width: 56, height: 56, borderRadius: 14, overflow: "hidden", backgroundColor: colors.border },
+  attachRemove: { position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: "rgba(0,0,0,.55)", alignItems: "center", justifyContent: "center" },
+  attachBeer: { flexShrink: 1, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 10 },
+  attachBeerName: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.text },
+  attachBeerSub: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
+  attachBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.border, alignItems: "center", justifyContent: "center" },
   sendBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
 });

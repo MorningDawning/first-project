@@ -41,6 +41,13 @@
         }
       ],
       [
+        "expo-audio",
+        {
+          "microphonePermission": "BeerVia использует микрофон для записи голосовых сообщений.",
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

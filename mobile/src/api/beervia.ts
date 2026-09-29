@@ -116,8 +116,8 @@ export const postsApi = {
   like: (id: string) => api.post<LikeState>(`/posts/${id}/like`).then((r) => r.data),
   unlike: (id: string) => api.delete<LikeState>(`/posts/${id}/like`).then((r) => r.data),
   comments: (id: string) => api.get<PostComment[]>(`/posts/${id}/comments`).then((r) => r.data),
-  addComment: (id: string, text: string, parentId?: string) =>
-    api.post<PostComment>(`/posts/${id}/comments`, { text, parentId }).then((r) => r.data),
+  addComment: (id: string, comment: OutgoingComment) =>
+    api.post<PostComment>(`/posts/${id}/comments`, comment).then((r) => r.data),
   report: (id: string, reason?: string) => api.post(`/posts/${id}/report`, { reason }).then((r) => r.data),
 };
 
@@ -158,10 +158,33 @@ export const uploadsApi = {
       .post<{ url: string }>("/uploads", form, { headers: { "Content-Type": "multipart/form-data" } })
       .then((r) => r.data.url);
   },
+  /** Голосовое сообщение: файл, записанный на телефоне (m4a), возвращает ссылку на загрузку. */
+  audio: async (uri: string) => {
+    const form = new FormData();
+    const ext = /\.(m4a|mp3|wav|caf|webm|ogg)$/i.exec(uri)?.[1].toLowerCase() ?? "m4a";
+    const type = ext === "m4a" ? "audio/mp4" : `audio/${ext}`;
+    if (Platform.OS === "web") {
+      form.append("audio", await (await fetch(uri)).blob(), `voice.${ext}`);
+    } else {
+      form.append("audio", { uri, name: `voice.${ext}`, type } as unknown as Blob);
+    }
+    return api
+      .post<{ url: string }>("/uploads/audio", form, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((r) => r.data.url);
+  },
 };
 
 export type OutgoingMessage = {
   text?: string;
+  beerId?: string;
+  photo?: { url: string; width?: number; height?: number };
+  audio?: { url: string; durationMs: number };
+  replyToId?: string;
+};
+
+export type OutgoingComment = {
+  text?: string;
+  parentId?: string;
   beerId?: string;
   photo?: { url: string; width?: number; height?: number };
 };
@@ -175,6 +198,10 @@ export const chatsApi = {
     api.post<{ id: string }>("/chats/group", { title, memberIds }).then((r) => r.data.id),
   send: (chatId: string, message: OutgoingMessage) =>
     api.post<{ id: string }>(`/chats/${chatId}/messages`, message).then((r) => r.data),
+  editMessage: (chatId: string, messageId: string, text: string) =>
+    api.patch(`/chats/${chatId}/messages/${messageId}`, { text }).then((r) => r.data),
+  deleteMessage: (chatId: string, messageId: string) =>
+    api.delete(`/chats/${chatId}/messages/${messageId}`).then((r) => r.data),
   rename: (chatId: string, title: string) => api.patch(`/chats/${chatId}`, { title }).then((r) => r.data),
   addMembers: (chatId: string, userIds: string[]) =>
     api.post(`/chats/${chatId}/members`, { userIds }).then((r) => r.data),

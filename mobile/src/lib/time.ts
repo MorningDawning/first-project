@@ -57,3 +57,9 @@ export function dayLabel(iso: string): string {
 export function sameDay(a: string, b: string): boolean {
   return startOfDay(new Date(a)) === startOfDay(new Date(b));
 }
+
+/** Длительность голосового: 0:07, 1:23. */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(total / 60)}:${pad(total % 60)}`;
+}

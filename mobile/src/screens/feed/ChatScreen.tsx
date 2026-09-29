@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import { ActivityIndicator, Alert, Animated, FlatList, Image, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,18 +11,22 @@ import { BeerArt } from "../../components/BeerArt";
 import { BeerPicker } from "../../components/BeerPicker";
 import { GroupAvatar } from "../../components/GroupAvatar";
 import { ImageViewer } from "../../components/ImageViewer";
+import { VoiceBubble } from "../../components/VoiceBubble";
 import { Icon } from "../../components/icons/Icon";
 import { ErrorView, LoadingView } from "../../components/StateViews";
 import { useAuth } from "../../context/AuthContext";
 import { chatsApi, OutgoingMessage, uploadsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { resolveMediaUrl } from "../../api/config";
-import { clock, dayLabel, plural, sameDay } from "../../lib/time";
+import { clock, dayLabel, formatDuration, plural, sameDay } from "../../lib/time";
+import { pickImage } from "../../lib/pickImage";
 import { useKeyboardAvoidance } from "../../lib/useKeyboardAvoidance";
+import { MAX_VOICE_MS, useVoiceRecorder } from "../../lib/useVoiceRecorder";
+import { stopVoice } from "../../lib/voicePlayer";
 import { useRealtimeConnected, useRealtimeEvents, useRealtimeSend } from "../../lib/realtime";
 import { colors, fonts, matchTint, radius, spacing } from "../../theme/colors";
 import { FeedStackParamList } from "../../navigation/types";
-import { ChatMessage, ChatThread, UserBrief } from "../../types";
+import { ChatMessage, ChatThread, MessageQuote, UserBrief } from "../../types";
 
 type Props = NativeStackScreenProps<FeedStackParamList, "Chat">;
 
@@ -86,6 +89,16 @@ export function ChatScreen({ route, navigation }: Props) {
   const [attachOpen, setAttachOpen] = useState(false);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [menuFor, setMenuFor] = useState<ChatMessage | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [voiceSending, setVoiceSending] = useState(false);
+  const recorder = useVoiceRecorder();
+  const recorderRef = useRef(recorder);
+  recorderRef.current = recorder;
+  const replyRef = useRef<ChatMessage | null>(null);
+  replyRef.current = replyTo;
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const nearBottom = useRef(true);
@@ -95,9 +108,19 @@ export function ChatScreen({ route, navigation }: Props) {
   const stickUntil = useRef(0);
   const lastTypingSent = useRef(0);
 
+  const firstLoad = useRef(true);
+
   const load = useCallback(async () => {
     try {
-      setThread(await chatsApi.thread(chatId));
+      const data = await chatsApi.thread(chatId);
+      if (firstLoad.current) {
+        // Длинная переписка дорисовывается порциями и её высота уточняется по ходу:
+        // пока идёт первая отрисовка, держимся у конца, а не сдаёмся на первой же недокрутке.
+        firstLoad.current = false;
+        stickUntil.current = Date.now() + 1_500;
+        nearBottom.current = true;
+      }
+      setThread(data);
       setError(null);
     } catch (e) {
       setError(apiErrorMessage(e, "Не удалось открыть чат"));
@@ -108,8 +131,19 @@ export function ChatScreen({ route, navigation }: Props) {
     useCallback(() => {
       setFocused(true);
       load();
-      return () => setFocused(false);
+      return () => {
+        setFocused(false);
+        stopVoice();
+      };
     }, [load])
+  );
+
+  // Ушли с экрана посреди записи — запись отбрасываем.
+  useEffect(
+    () => () => {
+      if (recorderRef.current.active) recorderRef.current.cancel();
+    },
+    []
   );
 
   // Живые события: новое сообщение, «прочитано», «печатает…», изменение состава.
@@ -150,10 +184,19 @@ export function ChatScreen({ route, navigation }: Props) {
     return () => clearInterval(timer);
   }, [anyTyping]);
 
-  const scrollToBottom = useCallback(() => listRef.current?.scrollToEnd({ animated: false }), []);
+  // К концу едем по реальным размерам, которые сообщает сам список (содержимое минус видимая часть),
+  // а не через scrollToEnd: он опирается на прикидочные замеры строк и не доезжает, когда высота
+  // меняется на ходу (пузырь «печатает…», подпись «Прочитано», подгрузка фото).
+  const contentH = useRef(0);
+  const viewH = useRef(0);
+  const scrollEnd = useCallback((animated: boolean) => {
+    listRef.current?.scrollToOffset({ offset: Math.max(0, contentH.current - viewH.current), animated });
+  }, []);
 
   async function deliver(message: OutgoingMessage) {
-    await chatsApi.send(chatId, message);
+    const reply = replyRef.current;
+    await chatsApi.send(chatId, { ...message, replyToId: reply?.id });
+    if (reply) setReplyTo((cur) => (cur?.id === reply.id ? null : cur));
     stickUntil.current = Date.now() + 2_000;
     // Как в Telegram: своё сообщение всегда возвращает к концу переписки,
     // даже если до этого пролистал вверх искать старое.
@@ -177,6 +220,7 @@ export function ChatScreen({ route, navigation }: Props) {
 
   async function sendText() {
     const body = text.trim();
+    if (editing) return saveEdit(body);
     if (!body) return;
     setText("");
     try {
@@ -185,6 +229,102 @@ export function ChatScreen({ route, navigation }: Props) {
       setText(body);
     }
   }
+
+  async function saveEdit(body: string) {
+    if (!editing || sending) return;
+    if (!body && !editing.photo && !editing.beer) return;
+    const target = editing;
+    setSending(true);
+    try {
+      if (body !== (target.text ?? "")) await chatsApi.editMessage(chatId, target.id, body);
+      setEditing(null);
+      setText("");
+      await load();
+    } catch (e) {
+      Alert.alert("Не удалось изменить", apiErrorMessage(e));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function startReply(message: ChatMessage) {
+    setEditing(null);
+    setReplyTo(message);
+  }
+
+  function startEdit(message: ChatMessage) {
+    setReplyTo(null);
+    setEditing(message);
+    setText(message.text ?? "");
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setText("");
+  }
+
+  function confirmDelete(message: ChatMessage) {
+    Alert.alert("Удалить сообщение?", "Оно исчезнет у всех участников чата.", [
+      { text: "Отмена", style: "cancel" },
+      {
+        text: "Удалить",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await chatsApi.deleteMessage(chatId, message.id);
+            if (replyRef.current?.id === message.id) setReplyTo(null);
+            if (editing?.id === message.id) cancelEdit();
+            await load();
+          } catch (e) {
+            Alert.alert("Не удалось удалить", apiErrorMessage(e));
+          }
+        },
+      },
+    ]);
+  }
+
+  /** Тап по цитате: прокрутить к исходному сообщению и на секунду подсветить его. */
+  function jumpTo(messageId: string) {
+    const index = thread?.messages.findIndex((m) => m.id === messageId) ?? -1;
+    if (index < 0) return;
+    nearBottom.current = false;
+    stickUntil.current = 0;
+    listRef.current?.scrollToIndex({ index, viewPosition: 0.4, animated: true });
+    setHighlightId(messageId);
+    setTimeout(() => setHighlightId((cur) => (cur === messageId ? null : cur)), 1_400);
+  }
+
+  // ----- голосовые -----
+
+  async function startRecording() {
+    Keyboard.dismiss();
+    const result = await recorder.start();
+    if (result === "denied") Alert.alert("Нет доступа к микрофону", "Разрешите доступ к микрофону в настройках телефона.");
+    else if (result === "error") Alert.alert("Не удалось начать запись", "Попробуйте ещё раз.");
+  }
+
+  async function sendVoice() {
+    const recorded = await recorder.finish();
+    if (!recorded) return;
+    setVoiceSending(true);
+    nearBottom.current = true;
+    stickUntil.current = Date.now() + 3_000;
+    try {
+      const url = await uploadsApi.audio(recorded.uri);
+      await deliver({ audio: { url, durationMs: recorded.durationMs } });
+    } catch (e) {
+      Alert.alert("Голосовое не отправилось", apiErrorMessage(e));
+    } finally {
+      stickUntil.current = Date.now() + 1_500;
+      setVoiceSending(false);
+    }
+  }
+
+  // Лимит длины записи: дошли до конца — отправляем сами.
+  useEffect(() => {
+    if (recorder.active && recorder.durationMs >= MAX_VOICE_MS) sendVoice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.tick]);
 
   function onChangeText(value: string) {
     setText(value);
@@ -195,24 +335,8 @@ export function ChatScreen({ route, navigation }: Props) {
   }
 
   async function pickPhoto(source: "library" | "camera") {
-    let result: ImagePicker.ImagePickerResult;
-    if (source === "camera") {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert("Нет доступа к камере", "Разрешите доступ к камере в настройках телефона.");
-        return;
-      }
-      result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-    } else {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert("Нет доступа к фото", "Разрешите доступ к галерее в настройках телефона.");
-        return;
-      }
-      result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
-    }
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
+    const asset = await pickImage(source);
+    if (!asset) return;
 
     // Написанный в поле текст становится подписью к фото.
     const caption = text.trim();
@@ -242,6 +366,18 @@ export function ChatScreen({ route, navigation }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [text, chatId]
   );
+
+  const menuOptions = menuFor
+    ? [
+        { key: "reply", label: "Ответить", icon: "reply" as const, onPress: () => startReply(menuFor) },
+        ...(menuFor.fromMe && !menuFor.audio
+          ? [{ key: "edit", label: "Изменить", icon: "pencil" as const, onPress: () => startEdit(menuFor) }]
+          : []),
+        ...(menuFor.fromMe
+          ? [{ key: "delete", label: "Удалить у всех", icon: "trash" as const, onPress: () => confirmDelete(menuFor) }]
+          : []),
+      ]
+    : [];
 
   if (!thread) {
     return error ? <ErrorView message={error} onRetry={load} /> : <LoadingView label="Открываем чат…" />;
@@ -285,6 +421,14 @@ export function ChatScreen({ route, navigation }: Props) {
           </View>
         );
       })}
+      {voiceSending && (
+        <View style={styles.rowMine}>
+          <View style={styles.voicePending}>
+            <ActivityIndicator color={colors.background} size="small" />
+            <Text style={styles.voicePendingText}>Отправляем голосовое…</Text>
+          </View>
+        </View>
+      )}
       {typingNames.length > 0 && (
         <View style={styles.typingRow}>
           {isGroup && <View style={styles.avatarSlot}>{typingUser && <Avatar user={typingUser} size={28} />}</View>}
@@ -321,21 +465,34 @@ export function ChatScreen({ route, navigation }: Props) {
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
+          // В чате не больше сотни сообщений — рисуем их все сразу. Иначе список подставляет
+          // «прикидочную» высоту невидимых строк, и прокрутка к концу каждый раз не доезжает.
+          initialNumToRender={100}
+          maxToRenderPerBatch={100}
+          windowSize={31}
           // Новое сообщение прокручивает вниз, только если читатель и так был внизу;
           // а когда список сжимается или растягивается под клавиатуру — всегда, чтобы
           // последнее сообщение оставалось перед глазами.
-          onContentSizeChange={() => {
+          onContentSizeChange={(_w, h) => {
+            contentH.current = h;
             if (!nearBottom.current && Date.now() > stickUntil.current) return;
-            listRef.current?.scrollToEnd({ animated: justSent.current });
+            scrollEnd(justSent.current);
             justSent.current = false;
           }}
-          onLayout={scrollToBottom}
+          onLayout={(e) => {
+            viewH.current = e.nativeEvent.layout.height;
+            scrollEnd(false);
+          }}
           onScroll={(e) => {
             if (Date.now() < stickUntil.current) return;
             const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
             nearBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
           }}
           scrollEventThrottle={100}
+          onScrollToIndexFailed={(info) => {
+            listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+            setTimeout(() => listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.4, animated: true }), 350);
+          }}
           ListEmptyComponent={<Text style={styles.empty}>Напиши первым, отправь фото или пиво карточкой</Text>}
           ListFooterComponent={footer}
           renderItem={({ item, index }) => {
@@ -343,7 +500,7 @@ export function ChatScreen({ route, navigation }: Props) {
             const next = messages[index + 1];
             const newDay = !prev || !sameDay(prev.createdAt, item.createdAt);
             return (
-              <View>
+              <View style={highlightId === item.id && styles.highlight}>
                 {newDay && (
                   <View style={styles.dayChip}>
                     <Text style={styles.dayChipText}>{dayLabel(item.createdAt)}</Text>
@@ -358,6 +515,8 @@ export function ChatScreen({ route, navigation }: Props) {
                   onOpenBeer={(beerId) => navigation.navigate("BeerDetail", { beerId })}
                   onOpenPhoto={setViewerUrl}
                   onOpenUser={(userId) => navigation.navigate("UserProfile", { userId })}
+                  onLongPress={chat.canSend ? () => setMenuFor(item) : undefined}
+                  onOpenQuote={jumpTo}
                 />
                 {lastReadOwn?.id === item.id && (
                   <Text style={styles.readReceipt}>
@@ -372,26 +531,70 @@ export function ChatScreen({ route, navigation }: Props) {
         />
 
         {chat.canSend ? (
-          <View style={[styles.inputBar, { paddingBottom: kb.keyboardVisible ? 12 : Math.max(insets.bottom, 12) }]}>
-            <Pressable onPress={() => setAttachOpen(true)} style={styles.attachBtn} hitSlop={6}>
-              <Icon name="plus" color="#474238" size={22} strokeWidth={2.75} />
-            </Pressable>
-            <TextInput
-              value={text}
-              onChangeText={onChangeText}
-              placeholder="Сообщение"
-              placeholderTextColor={colors.textMuted}
-              style={styles.input}
-              multiline
-              maxLength={1000}
-            />
-            <Pressable
-              onPress={sendText}
-              disabled={!text.trim() || sending}
-              style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.45 }]}
-            >
-              <Icon name="arrowUp" color={colors.background} size={20} strokeWidth={2.75} />
-            </Pressable>
+          <View style={[styles.composer, { paddingBottom: kb.keyboardVisible ? 12 : Math.max(insets.bottom, 12) }]}>
+            {(replyTo || editing) && (
+              <View style={styles.contextBar}>
+                <View style={styles.contextAccent} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.contextTitle} numberOfLines={1}>
+                    {editing ? "Изменение сообщения" : `Ответ: ${replyTo!.fromMe ? "себе" : replyTo!.sender.name.split(" ")[0]}`}
+                  </Text>
+                  <Text style={styles.contextText} numberOfLines={1}>{previewOf(editing ?? replyTo!)}</Text>
+                </View>
+                <Pressable onPress={editing ? cancelEdit : () => setReplyTo(null)} hitSlop={10}>
+                  <Icon name="close" color={colors.textMuted} size={18} />
+                </Pressable>
+              </View>
+            )}
+            {recorder.active ? (
+              <View style={styles.inputBar}>
+                <Pressable onPress={recorder.cancel} style={styles.attachBtn} hitSlop={6}>
+                  <Icon name="trash" color={colors.danger} size={20} />
+                </Pressable>
+                <View style={styles.recordPill}>
+                  <RecordingDot />
+                  <Text style={styles.recordTime}>{formatDuration(recorder.durationMs)}</Text>
+                  <View style={styles.levels}>
+                    {recorder.levels.map((l, i) => (
+                      <View key={i} style={{ width: 3, borderRadius: 2, height: 4 + l * 22, backgroundColor: colors.primary }} />
+                    ))}
+                  </View>
+                </View>
+                <Pressable onPress={sendVoice} style={styles.sendBtn}>
+                  <Icon name="arrowUp" color={colors.background} size={20} strokeWidth={2.75} />
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.inputBar}>
+                {!editing && (
+                  <Pressable onPress={() => setAttachOpen(true)} style={styles.attachBtn} hitSlop={6}>
+                    <Icon name="plus" color="#474238" size={22} strokeWidth={2.75} />
+                  </Pressable>
+                )}
+                <TextInput
+                  value={text}
+                  onChangeText={onChangeText}
+                  placeholder="Сообщение"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.input}
+                  multiline
+                  maxLength={1000}
+                />
+                {text.trim() || editing ? (
+                  <Pressable
+                    onPress={sendText}
+                    disabled={sending || (!!editing && !text.trim() && !editing.photo && !editing.beer)}
+                    style={[styles.sendBtn, (sending || (!!editing && !text.trim() && !editing.photo && !editing.beer)) && { opacity: 0.45 }]}
+                  >
+                    <Icon name={editing ? "check" : "arrowUp"} color={colors.background} size={20} strokeWidth={2.75} />
+                  </Pressable>
+                ) : (
+                  <Pressable onPress={startRecording} disabled={voiceSending} style={[styles.sendBtn, voiceSending && { opacity: 0.45 }]}>
+                    <Icon name="mic" color={colors.background} size={20} strokeWidth={2.4} />
+                  </Pressable>
+                )}
+              </View>
+            )}
           </View>
         ) : (
           <View style={[styles.locked, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -402,6 +605,7 @@ export function ChatScreen({ route, navigation }: Props) {
       </Animated.View>
 
       <AttachSheet visible={attachOpen} options={attachOptions} onClose={() => setAttachOpen(false)} />
+      <AttachSheet visible={menuFor !== null} options={menuOptions} onClose={() => setMenuFor(null)} />
       <BeerPicker
         visible={beerPickerOpen}
         onClose={() => setBeerPickerOpen(false)}
@@ -440,6 +644,62 @@ function TypingBubble() {
   );
 }
 
+/** Короткое описание сообщения для полосы «ответ / изменение». */
+function previewOf(m: ChatMessage): string {
+  if (m.text) return m.text;
+  if (m.audio) return "Голосовое сообщение";
+  if (m.photo) return "Фото";
+  if (m.beer) return `Пиво: ${m.beer.name}`;
+  return "Сообщение";
+}
+
+function quoteLabel(q: MessageQuote): string {
+  if (q.deleted) return "Сообщение удалено";
+  if (q.text) return q.text;
+  if (q.kind === "voice") return "Голосовое сообщение";
+  if (q.kind === "photo") return "Фото";
+  if (q.kind === "beer") return `Пиво: ${q.beerName ?? ""}`;
+  return "Сообщение";
+}
+
+function RecordingDot() {
+  const opacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.25, duration: 600, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+  return <Animated.View style={[styles.recDot, { opacity }]} />;
+}
+
+function QuoteBlock({ quote, mine, inside, onPress }: { quote: MessageQuote; mine: boolean; inside: boolean; onPress: () => void }) {
+  const onDark = mine && inside; // внутри своего оранжевого пузыря
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.quote, inside ? (onDark ? styles.quoteOnMine : styles.quoteOnTheirs) : styles.quoteStandalone]}
+    >
+      <View style={[styles.quoteBar, { backgroundColor: onDark ? colors.background : colors.primary }]} />
+      <View style={{ flexShrink: 1 }}>
+        <Text style={[styles.quoteName, { color: onDark ? colors.background : colors.primary }]} numberOfLines={1}>
+          {quote.senderName}
+        </Text>
+        <Text
+          style={[styles.quoteText, { color: onDark ? "rgba(251,243,231,0.85)" : colors.textMuted }, quote.deleted && { fontStyle: "italic" }]}
+          numberOfLines={2}
+        >
+          {quoteLabel(quote)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function MessageRow({
   message,
   isGroup,
@@ -449,6 +709,8 @@ function MessageRow({
   onOpenBeer,
   onOpenPhoto,
   onOpenUser,
+  onLongPress,
+  onOpenQuote,
 }: {
   message: ChatMessage;
   isGroup: boolean;
@@ -458,6 +720,8 @@ function MessageRow({
   onOpenBeer: (beerId: string) => void;
   onOpenPhoto: (url: string) => void;
   onOpenUser: (userId: string) => void;
+  onLongPress?: () => void;
+  onOpenQuote: (messageId: string) => void;
 }) {
   if (message.kind === "system") {
     return (
@@ -484,20 +748,42 @@ function MessageRow({
           )}
         </View>
       )}
-      <View style={[styles.column, mine ? styles.rowMine : styles.rowTheirs]}>
+      <Pressable
+        onLongPress={message.deleted ? undefined : onLongPress}
+        delayLongPress={320}
+        style={[styles.column, mine ? styles.rowMine : styles.rowTheirs]}
+      >
         {showSideAvatar && startsRun && (
           <Text style={[styles.senderName, { color: nameColor(message.sender.id) }]}>{message.sender.name}</Text>
         )}
 
+        {message.deleted && (
+          <View style={styles.deletedBubble}>
+            <Text style={styles.deletedText}>Сообщение удалено</Text>
+          </View>
+        )}
+
+        {message.replyTo && !message.text && (
+          <QuoteBlock quote={message.replyTo} mine={mine} inside={false} onPress={() => onOpenQuote(message.replyTo!.id)} />
+        )}
+
+        {message.audio && <VoiceBubble id={message.id} url={message.audio.url} durationMs={message.audio.durationMs} mine={mine} />}
+
         {photo && (
-          <Pressable onPress={() => onOpenPhoto(photo.url)} style={[styles.photoWrap, photoSize(photo.width, photo.height)]}>
+          <Pressable onPress={() => onOpenPhoto(photo.url)} onLongPress={onLongPress} delayLongPress={320} style={[styles.photoWrap, photoSize(photo.width, photo.height)]}>
             <Image source={{ uri: resolveMediaUrl(photo.url) ?? undefined }} style={StyleSheet.absoluteFill} />
           </Pressable>
         )}
 
         {message.text ? (
           <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
-            <Text style={[styles.bubbleText, mine && { color: colors.background }]}>{message.text}</Text>
+            {message.replyTo && (
+              <QuoteBlock quote={message.replyTo} mine={mine} inside onPress={() => onOpenQuote(message.replyTo!.id)} />
+            )}
+            <Text style={[styles.bubbleText, mine && { color: colors.background }]}>
+              {message.text}
+              {message.editedAt ? <Text style={[styles.edited, mine && { color: "rgba(251,243,231,0.7)" }]}>{"  изменено"}</Text> : null}
+            </Text>
           </View>
         ) : null}
 
@@ -520,7 +806,7 @@ function MessageRow({
             </Pressable>
           </View>
         )}
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -570,7 +856,33 @@ const styles = StyleSheet.create({
   openBtn: { height: 38, borderRadius: radius.pill, backgroundColor: colors.border, alignItems: "center", justifyContent: "center" },
   openText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.text },
 
-  inputBar: { flexDirection: "row", alignItems: "flex-end", gap: 10, paddingHorizontal: 16, paddingTop: 12 },
+  composer: { borderTopWidth: 0 },
+  contextBar: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginTop: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border },
+  contextAccent: { width: 3, alignSelf: "stretch", borderRadius: 2, backgroundColor: colors.primary },
+  contextTitle: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.primary },
+  contextText: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, marginTop: 1 },
+
+  recordPill: { flex: 1, minHeight: 46, borderRadius: 23, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, overflow: "hidden" },
+  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.danger },
+  recordTime: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.text, minWidth: 38 },
+  levels: { flex: 1, height: 30, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 2, overflow: "hidden" },
+  voicePending: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.primary, borderRadius: 22, paddingVertical: 12, paddingHorizontal: 16 },
+  voicePendingText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.background },
+
+  highlight: { backgroundColor: "rgba(232,163,61,0.22)", borderRadius: 16 },
+  edited: { fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.textMuted },
+  deletedBubble: { borderWidth: 1, borderColor: colors.border, borderStyle: "dashed", borderRadius: 22, paddingVertical: 10, paddingHorizontal: 14 },
+  deletedText: { fontFamily: fonts.bodyMedium, fontSize: 14, fontStyle: "italic", color: colors.textMuted },
+
+  quote: { flexDirection: "row", gap: 8, borderRadius: 12, paddingVertical: 6, paddingRight: 10, paddingLeft: 8, marginBottom: 6, alignSelf: "stretch" },
+  quoteOnMine: { backgroundColor: "rgba(251,243,231,0.16)" },
+  quoteOnTheirs: { backgroundColor: "rgba(216,90,48,0.09)" },
+  quoteStandalone: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 0, maxWidth: 250 },
+  quoteBar: { width: 3, borderRadius: 2 },
+  quoteName: { fontFamily: fonts.bodyBold, fontSize: 12 },
+  quoteText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
+
+  inputBar: { flexDirection: "row", alignItems: "flex-end", gap: 10, paddingHorizontal: 16, paddingTop: 10 },
   attachBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.border, alignItems: "center", justifyContent: "center" },
   input: { flex: 1, maxHeight: 110, minHeight: 46, borderRadius: 23, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontFamily: fonts.body, fontSize: 15, color: colors.text },
   sendBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
