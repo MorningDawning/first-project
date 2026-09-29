@@ -1,10 +1,14 @@
 # Blueprint для Render: одним действием создаёт сервер API и базу Postgres.
-# Подробная инструкция: DEPLOY.md
+# Сейчас выбраны БЕСПЛАТНЫЕ тарифы (для пробы). Подробности и ограничения: DEPLOY.md
+#
+# Чтобы перейти на платные и сохранить фото/голосовые между перезапусками, замените:
+#   plan: free  ->  plan: starter  (у сервера)  и  plan: basic-256mb  (у базы)
+# и добавьте под сервером диск и переменную (раскомментируйте строки ниже).
 databases:
   - name: beervia-db
     databaseName: beervia
     user: beervia
-    plan: basic-256mb
+    plan: free
 
 services:
   - type: web
@@ -12,18 +16,17 @@ services:
     runtime: docker
     dockerfilePath: ./server/Dockerfile
     dockerContext: ./server
-    plan: starter
+    plan: free
     healthCheckPath: /health
-    # Постоянный диск для фото и голосовых сообщений (без него файлы пропадают при обновлении сервера).
-    disk:
-      name: uploads
-      mountPath: /data
-      sizeGB: 2
+    # disk:
+    #   name: uploads
+    #   mountPath: /data
+    #   sizeGB: 2
     envVars:
       - key: NODE_ENV
         value: production
-      - key: UPLOADS_DIR
-        value: /data/uploads
+      # - key: UPLOADS_DIR
+      #   value: /data/uploads
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
