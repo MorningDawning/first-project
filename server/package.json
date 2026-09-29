@@ -13,7 +13,10 @@
     "seed:social": "tsx prisma/seedSocial.ts",
     "sync-photos": "tsx src/scripts/syncBeerPhotos.ts",
     "start:prod": "prisma migrate deploy && tsx prisma/bootstrap.ts && node dist/index.js",
-    "bootstrap": "tsx prisma/bootstrap.ts"
+    "bootstrap": "tsx prisma/bootstrap.ts",
+    "dev:local": "node scripts/local.js tsx watch src/index.ts",
+    "seed:local": "node scripts/local.js tsx prisma/seed.ts",
+    "seed:social:local": "node scripts/local.js tsx prisma/seedSocial.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

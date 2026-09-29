@@ -4,3 +4,5 @@ dist/
 prisma/dev.db
 prisma/dev.db-journal
 uploads/
+
+prisma/schema.local.prisma

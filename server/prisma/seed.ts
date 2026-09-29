@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 // если явно не передать --force — чтобы случайно не удалить настоящие данные.
 function assertSafeTarget() {
   const url = process.env.DATABASE_URL ?? "";
-  const local = /@(localhost|127\.0\.0\.1)(:|\/|\?)/.test(url) || url.includes("host=/");
+  const local = url.startsWith("file:") || /@(localhost|127\.0\.0\.1)(:|\/|\?)/.test(url) || url.includes("host=/");
   if (!local && !process.argv.includes("--force")) {
     console.error("Отказ: DATABASE_URL указывает не на локальную базу, а seed стирает все данные.\nЕсли это точно нужно, запустите с флагом --force.");
     process.exit(1);
