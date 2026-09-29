@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +14,7 @@ import { useAuth } from "../../context/AuthContext";
 import { commentsApi, postsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { plural, timeAgo } from "../../lib/time";
+import { useKeyboardAvoidance } from "../../lib/useKeyboardAvoidance";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
 import { FeedStackParamList } from "../../navigation/types";
 import { FeedPost, FriendStatus, PostComment } from "../../types";
@@ -24,6 +25,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
   const { postId } = route.params;
   const { user: me } = useAuth();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAvoidance();
 
   const [post, setPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -203,7 +205,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <Animated.View ref={kb.ref} collapsable={false} style={[{ flex: 1 }, kb.style]}>
         <FlatList
           data={comments}
           keyExtractor={(c) => c.id}
@@ -238,7 +240,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
           )}
         />
 
-        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={[styles.composer, { paddingBottom: kb.keyboardVisible ? 12 : Math.max(insets.bottom, 12) }]}>
           {replyTo && (
             <View style={styles.replyChip}>
               <Text style={styles.replyChipText} numberOfLines={1}>Ответ для {replyTo.user.name}</Text>
@@ -267,7 +269,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
             </Pressable>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
     </Screen>
   );
 }

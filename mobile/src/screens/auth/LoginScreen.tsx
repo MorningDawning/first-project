@@ -1,17 +1,19 @@
 import React, { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { Button } from "../../components/Button";
 import { useAuth } from "../../context/AuthContext";
 import { apiErrorMessage } from "../../api/client";
+import { useKeyboardAvoidance } from "../../lib/useKeyboardAvoidance";
 import { colors, fonts, spacing, typography } from "../../theme/colors";
 import { AuthStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 export function LoginScreen({ navigation }: Props) {
+  const kb = useKeyboardAvoidance();
   const { login } = useAuth();
   const [email, setEmail] = useState("demo@beervia.app");
   const [password, setPassword] = useState("demo1234");
@@ -32,6 +34,7 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <Screen>
+      <Animated.View ref={kb.ref} collapsable={false} style={[{ flex: 1 }, kb.style]}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.logo}>🍺 BeerVia</Text>
         <Text style={styles.subtitle}>Сканируй, оценивай, находи своё пиво</Text>
@@ -63,6 +66,7 @@ export function LoginScreen({ navigation }: Props) {
           <Text style={styles.hint}>Демо-доступ уже подставлен — просто нажмите «Войти».</Text>
         </View>
       </ScrollView>
+      </Animated.View>
     </Screen>
   );
 }

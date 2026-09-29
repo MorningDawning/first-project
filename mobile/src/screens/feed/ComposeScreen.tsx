@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,7 +24,7 @@ import { Icon, IconName } from "../../components/icons/Icon";
 import { useAuth } from "../../context/AuthContext";
 import { beersApi, feedApi, uploadsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
-import { resolveMediaUrl } from "../../api/config";
+import { useKeyboardAvoidance } from "../../lib/useKeyboardAvoidance";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
 import { FeedStackParamList } from "../../navigation/types";
 
@@ -40,6 +39,8 @@ export function ComposeScreen() {
   const route = useRoute<RouteProp<FeedStackParamList, "Compose">>();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAvoidance();
+  const textRef = useRef<TextInput>(null);
 
   const [text, setText] = useState("");
   const [beer, setBeer] = useState<PickedBeer | null>(null);
@@ -50,6 +51,11 @@ export function ComposeScreen() {
   const [visibility, setVisibility] = useState<Visibility>("friends");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => textRef.current?.focus(), 450);
+    return () => clearTimeout(timer);
+  }, []);
 
   const initialBeerId = route.params?.beerId;
   useEffect(() => {
@@ -147,7 +153,7 @@ export function ComposeScreen() {
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <Animated.View ref={kb.ref} collapsable={false} style={[{ flex: 1 }, kb.style]}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.authorRow}>
             {user && <Avatar user={user} size={44} me />}
@@ -160,6 +166,7 @@ export function ComposeScreen() {
           </View>
 
           <TextInput
+            ref={textRef}
             value={text}
             onChangeText={setText}
             placeholder="Что пьёшь сегодня?"
@@ -167,7 +174,6 @@ export function ComposeScreen() {
             style={styles.input}
             multiline
             maxLength={500}
-            autoFocus
           />
 
           {beer && (
@@ -232,7 +238,7 @@ export function ComposeScreen() {
           )}
         </ScrollView>
 
-        <View style={[styles.toolbar, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+        <View style={[styles.toolbar, { paddingBottom: kb.keyboardVisible ? 12 : Math.max(insets.bottom, 14) }]}>
           {tools.map((t) => (
             <Pressable key={t.key} onPress={t.onPress} style={[styles.tool, t.active && styles.toolActive]}>
               <Icon name={t.icon} color={t.active ? colors.background : "#474238"} size={18} />
@@ -240,7 +246,7 @@ export function ComposeScreen() {
             </Pressable>
           ))}
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
 
       <BeerPicker
         visible={pickerOpen}

@@ -1,14 +1,16 @@
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { Button } from "../../components/Button";
 import { useAuth } from "../../context/AuthContext";
 import { userApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
+import { useKeyboardAvoidance } from "../../lib/useKeyboardAvoidance";
 import { colors, spacing, typography } from "../../theme/colors";
 
 export function SettingsScreen() {
+  const kb = useKeyboardAvoidance();
   const { user, logout, refreshUser } = useAuth();
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
@@ -46,6 +48,7 @@ export function SettingsScreen() {
 
   return (
     <Screen>
+      <Animated.View ref={kb.ref} collapsable={false} style={[{ flex: 1 }, kb.style]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Настройки</Text>
 
@@ -66,6 +69,7 @@ export function SettingsScreen() {
           <Button title="Выйти из аккаунта" variant="outline" onPress={logout} />
         </View>
       </ScrollView>
+      </Animated.View>
     </Screen>
   );
 }

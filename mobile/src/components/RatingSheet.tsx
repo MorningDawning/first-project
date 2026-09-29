@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BeerArt } from "./BeerArt";
 import { StarRating } from "./StarRating";
 import { Button } from "./Button";
+import { useKeyboardAvoidance } from "../lib/useKeyboardAvoidance";
 import { colors, fonts, radius, spacing } from "../theme/colors";
 
 export const FLAVOR_TAGS = ["Сочный", "Цитрус", "Мягкая горечь", "Плотное", "Тропики", "Водянистое", "Слишком сладкое"];
@@ -33,6 +34,7 @@ export function RatingSheet({
   const [rating, setRating] = useState(initialRating);
   const [text, setText] = useState(initialText);
   const [tags, setTags] = useState<string[]>(initialTags);
+  const kb = useKeyboardAvoidance();
 
   useEffect(() => {
     if (visible) {
@@ -48,8 +50,9 @@ export function RatingSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Animated.View ref={kb.ref} collapsable={false} style={[styles.overlay, kb.style]}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, kb.keyboardVisible && { paddingBottom: spacing.lg }]}>
         <View style={styles.handle} />
 
         <View style={styles.headerRow}>
@@ -96,17 +99,15 @@ export function RatingSheet({
           disabled={rating === 0}
         />
       </View>
+      </Animated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(44,24,16,0.4)" },
+  overlay: { flex: 1, backgroundColor: "rgba(44,24,16,0.4)" },
+  backdrop: { flex: 1 },
   sheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: colors.background,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,6 +13,7 @@ import { ErrorView, LoadingView } from "../../components/StateViews";
 import { messagesApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { clock, dayLabel, sameDay } from "../../lib/time";
+import { useKeyboardAvoidance } from "../../lib/useKeyboardAvoidance";
 import { colors, fonts, matchTint, radius, spacing } from "../../theme/colors";
 import { FeedStackParamList } from "../../navigation/types";
 import { ChatMessage, ChatThread } from "../../types";
@@ -22,6 +23,7 @@ type Props = NativeStackScreenProps<FeedStackParamList, "Chat">;
 export function ChatScreen({ route, navigation }: Props) {
   const { userId } = route.params;
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAvoidance();
 
   const [thread, setThread] = useState<ChatThread | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +114,7 @@ export function ChatScreen({ route, navigation }: Props) {
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <Animated.View ref={kb.ref} collapsable={false} style={[{ flex: 1 }, kb.style]}>
         <FlatList
           ref={listRef}
           data={messages}
@@ -144,7 +146,7 @@ export function ChatScreen({ route, navigation }: Props) {
         />
 
         {canSend ? (
-          <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <View style={[styles.inputBar, { paddingBottom: kb.keyboardVisible ? 12 : Math.max(insets.bottom, 12) }]}>
             <Pressable onPress={() => setPickerOpen(true)} style={styles.attachBtn} hitSlop={6}>
               <Icon name="scan" color="#474238" size={20} strokeWidth={2.75} />
             </Pressable>
@@ -166,12 +168,12 @@ export function ChatScreen({ route, navigation }: Props) {
             </Pressable>
           </View>
         ) : (
-          <View style={[styles.locked, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <View style={[styles.locked, { paddingBottom: kb.keyboardVisible ? 12 : Math.max(insets.bottom, 12) }]}>
             <Icon name="lock" color={colors.textMuted} size={16} />
             <Text style={styles.lockedText}>Писать можно только друзьям</Text>
           </View>
         )}
-      </KeyboardAvoidingView>
+      </Animated.View>
 
       <BeerPicker
         visible={pickerOpen}

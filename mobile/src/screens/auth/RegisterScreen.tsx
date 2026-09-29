@@ -1,17 +1,19 @@
 import React, { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { Button } from "../../components/Button";
 import { useAuth } from "../../context/AuthContext";
 import { apiErrorMessage } from "../../api/client";
+import { useKeyboardAvoidance } from "../../lib/useKeyboardAvoidance";
 import { colors, spacing, typography } from "../../theme/colors";
 import { AuthStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
 
 export function RegisterScreen({ navigation }: Props) {
+  const kb = useKeyboardAvoidance();
   const { register } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,6 +35,7 @@ export function RegisterScreen({ navigation }: Props) {
 
   return (
     <Screen>
+      <Animated.View ref={kb.ref} collapsable={false} style={[{ flex: 1 }, kb.style]}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Создать аккаунт</Text>
 
@@ -58,6 +61,7 @@ export function RegisterScreen({ navigation }: Props) {
           <Button title="Уже есть аккаунт" variant="outline" onPress={() => navigation.goBack()} style={{ marginTop: spacing.sm }} />
         </View>
       </ScrollView>
+      </Animated.View>
     </Screen>
   );
 }
