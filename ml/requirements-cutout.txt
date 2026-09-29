@@ -1,0 +1,6 @@
+# Для make_cutouts.py --mode birefnet (экспериментально)
+transformers>=4.40
+timm
+einops
+kornia
+torchvision

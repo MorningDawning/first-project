@@ -45,7 +45,7 @@ export function BreweryDetailScreen() {
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.name}>{brewery.name}</Text>
-        <Text style={styles.location}>{brewery.country}{brewery.city ? `, ${brewery.city}` : ""}</Text>
+        <Text style={styles.location}>{[brewery.country !== "Не указана" ? brewery.country : null, brewery.city].filter(Boolean).join(", ")}</Text>
         {brewery.description && <Text style={styles.description}>{brewery.description}</Text>}
 
         <Text style={styles.sectionTitle}>Сорта пива ({brewery.beers.length})</Text>

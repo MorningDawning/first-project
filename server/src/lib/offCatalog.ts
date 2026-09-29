@@ -8,10 +8,27 @@ export type OffProduct = {
   brands?: string;
   categories_tags?: string[];
   countries_tags?: string[];
+  origins_tags?: string[];
   image_front_url?: string;
   nutriments?: Record<string, number | string>;
   unique_scans_n?: number;
 };
+
+/** Картинки Open Food Facts лежат в нескольких размерах (….400.jpg, ….200.jpg, ….full.jpg): берём полный. */
+export function fullSizeUrl(url: string): string {
+  return url.replace(/\.(?:100|200|400)\.jpg$/i, ".full.jpg");
+}
+
+/**
+ * Страна пивоварни. countries_tags — это страны, где товар продаётся (у Жигулей там может быть Франция), поэтому
+ * сначала смотрим происхождение (origins_tags); продажи считаем подсказкой, только если страна одна.
+ */
+function countryOf(p: OffProduct): string | null {
+  const fromOrigin = (p.origins_tags ?? []).map((c) => COUNTRIES[c]).find(Boolean);
+  if (fromOrigin) return fromOrigin;
+  const sold = p.countries_tags ?? [];
+  return sold.length === 1 ? COUNTRIES[sold[0]] ?? null : null;
+}
 
 export type CatalogCandidate = {
   barcode: string;
@@ -136,8 +153,8 @@ export function toCandidate(p: OffProduct): CatalogCandidate | null {
     brand,
     style: styleFromTagsOrName(tags, p.product_name),
     abv,
-    country: (p.countries_tags ?? []).map((c) => COUNTRIES[c]).find(Boolean) ?? null,
-    imageUrl: image && /^https?:\/\//.test(image) ? image : null,
+    country: countryOf(p),
+    imageUrl: image && /^https?:\/\//.test(image) ? fullSizeUrl(image) : null,
     popularity: Number(p.unique_scans_n) || 0,
   };
 }

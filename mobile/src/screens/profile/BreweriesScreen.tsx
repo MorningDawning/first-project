@@ -66,7 +66,7 @@ export function BreweriesScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.meta}>{item.country}{item.city ? `, ${item.city}` : ""}</Text>
+                <Text style={styles.meta}>{[item.country !== "Не указана" ? item.country : null, item.city].filter(Boolean).join(", ")}</Text>
               </View>
               <Text style={styles.count}>{item.beerCount} сортов</Text>
             </Pressable>

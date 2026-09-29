@@ -37,7 +37,8 @@ const DELAY = Number(args.delay ?? 6500);
 const WITH_IMAGES = args["no-images"] === undefined;
 const DRY = args["dry-run"] !== undefined;
 const HEADERS = { "User-Agent": "BeerVia/0.1 (beervia.app)" };
-const FIELDS = "code,product_name,brands,categories_tags,countries_tags,image_front_url,nutriments,unique_scans_n";
+const FIELDS = "code,product_name,brands,categories_tags,countries_tags,origins_tags,image_front_url,nutriments,unique_scans_n";
+const REFRESH_IMAGES = args["refresh-images"] !== undefined; // заново скачать уже имеющиеся фото (например, в большем размере)
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -143,7 +144,10 @@ async function main() {
     labels[slug] = { beer: beer.name, brewery: c.brand };
     if (WITH_IMAGES && c.imageUrl) {
       const file = path.join(DATASET_DIR, slug, `off-${c.barcode}.jpg`);
-      if (fs.existsSync(file) || (await download(c.imageUrl, file))) {
+      const have = fs.existsSync(file) && !REFRESH_IMAGES;
+      // Полный размер есть не у всех картинок: если не нашёлся, берём 400 px.
+      const ok = have || (await download(c.imageUrl, file)) || (await download(c.imageUrl.replace(/\.full\.jpg$/i, ".400.jpg"), file));
+      if (ok) {
         photos++;
         fs.appendFileSync(
           path.join(DATASET_DIR, slug, "SOURCES.txt"),

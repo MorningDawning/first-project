@@ -148,7 +148,7 @@ export function BeerDetailScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerInfo}>
             <Text style={styles.name} numberOfLines={2}>{beer.name}</Text>
-            <Text style={styles.brewery} numberOfLines={1}>{beer.brewery.name} · {beer.brewery.country}</Text>
+            <Text style={styles.brewery} numberOfLines={1}>{beer.brewery.country && beer.brewery.country !== "Не указана" ? `${beer.brewery.name} · ${beer.brewery.country}` : beer.brewery.name}</Text>
             {beer.avgRating != null && (
               <View style={styles.ratingRow}>
                 <Text style={styles.ratingStar}>★</Text>
