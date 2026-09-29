@@ -52,9 +52,23 @@ async function fetchPage(country: string | null, page: number): Promise<OffProdu
     params.set("tag_contains_1", "contains");
     params.set("tag_1", country);
   }
-  const response = await fetch(`${BASE}/cgi/search.pl?${params}`, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`Open Food Facts ответил ${response.status}`);
-  return ((await response.json()) as { products?: OffProduct[] }).products ?? [];
+  // Open Food Facts нередко отвечает 503 или 429 (перегрузка, лимит запросов): пробуем ещё, с нарастающей паузой.
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt > 0) {
+      console.log(`  Open Food Facts занят (код ${lastStatus || "нет связи"}), ждём и пробуем снова (${attempt}/4)...`);
+      await sleep(10_000 * attempt);
+    }
+    try {
+      const response = await fetch(`${BASE}/cgi/search.pl?${params}`, { headers: HEADERS, signal: AbortSignal.timeout(60_000) });
+      if (response.ok) return ((await response.json()) as { products?: OffProduct[] }).products ?? [];
+      lastStatus = response.status;
+      if (response.status !== 429 && response.status < 500) break;
+    } catch {
+      lastStatus = 0;
+    }
+  }
+  throw new Error(`Open Food Facts не ответил (код ${lastStatus || "нет связи"})`);
 }
 
 /** Собирает до `limit` разных сортов для страны (или для мира, если country = null). */

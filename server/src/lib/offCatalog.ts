@@ -43,9 +43,50 @@ const GENERIC_WORDS = new Set([
   "пилснер", "пильзнер", "крепкое", "классическое", "оригинальное",
 ]);
 
+const ENTITIES: Record<string, string> = { "&quot;": '"', "&amp;": "&", "&apos;": "'", "&#39;": "'", "&lt;": "<", "&gt;": ">", "&nbsp;": " " };
+// В данных встречается и «&quot;», и «&quot» без точки с запятой.
+const decodeEntities = (text: string) => text.replace(/&(?:quot|amp|apos|lt|gt|nbsp|#39);?/g, (m) => ENTITIES[m.endsWith(";") ? m : `${m};`] ?? m);
+
+// Служебные приписки: не часть названия сорта.
+const NOISE = new RegExp(`${START}(?:пастеризованн\\p{L}*|непастеризованн\\p{L}*|без\\s+консервантов|pasteuri[sz]ed)${END}`, "giu");
+
+// Не пиво или не то, что ищем: напитки на основе пива, безалкогольное.
+const NOT_WANTED = /(?:напиток|безалкогол|non[- ]?alcohol|alcohol[- ]?free|alkoholfrei|sans alcool)/iu;
+const GENERIC_BRANDS = new Set(["пиво", "beer", "bier", "biere", "bière", "cerveza", "-", "нет", "без бренда"]);
+
+/** Если категории не подсказали стиль, угадываем по словам в названии. */
+export function styleFromName(name: string): string | null {
+  const n = fold(name);
+  const rules: [RegExp, string][] = [
+    [/new england|neipa|нью-?инглэнд/, "New England IPA"],
+    [/\bipa\b|ипа(?![\p{L}])|индиа пейл/u, "IPA"],
+    [/pale ale|пейл эль/, "Pale Ale"],
+    [/stout|стаут/, "Stout"],
+    [/porter|портер/, "Porter"],
+    [/weiss|weizen|wheat|hefe|пшеничн|вайс|вайцен|нефильтрованн/, "Weizen"],
+    [/sour|lambic|gose|ламбик|кислое/, "Sour"],
+    [/pils|пилснер|пильзнер|пилз/, "Pilsner"],
+    [/dunkel|schwarz|темн|dark|черн/, "Dark Lager"],
+    [/lager|лагер|светл|helles|export|экспорт|classic|классическ/, "Lager"],
+  ];
+  return rules.find(([re]) => re.test(n))?.[1] ?? null;
+}
+
+function styleFromTagsOrName(tags: string[], name: string): string {
+  const fromTags = styleFrom(tags);
+  return fromTags !== "Другое" ? fromTags : styleFromName(name) ?? "Другое";
+}
+
 /** «Балтика 7 Экспортное 0,45 л ж/б» → «7 Экспортное». «Жигулёвское светлое» и «Heineken Lager» остаются целиком. */
 export function cleanName(raw: string, brand: string): string {
-  let name = raw.replace(VOLUME, " ").replace(MULTI, " ").replace(PERCENT, " ").replace(PACKAGING, " ");
+  let name = decodeEntities(raw)
+    .replace(/[«»"“”„]/g, " ")
+    .replace(/№\s*/g, "")
+    .replace(NOISE, " ")
+    .replace(VOLUME, " ")
+    .replace(MULTI, " ")
+    .replace(PERCENT, " ")
+    .replace(PACKAGING, " ");
   name = name
     .replace(/[,;()\[\]]+/g, " ")
     .replace(/(?:^|\s)\.+(?=\s|$)/g, " ")
@@ -53,11 +94,19 @@ export function cleanName(raw: string, brand: string): string {
     .replace(/^[-–\s]+|[-–\s]+$/g, "")
     .replace(/^(?:пиво|beer|bier)\s+(?=\S)/i, "")
     .trim();
-  if (brand && fold(name).startsWith(fold(brand) + " ")) {
-    const rest = name.slice(brand.length).trim();
+  // Пивоварню в названии не повторяем: «светлое Балтика классическое 3» → «классическое 3».
+  const at = brand ? fold(name).indexOf(fold(brand)) : -1;
+  if (at >= 0) {
+    const rest = `${name.slice(0, at)} ${name.slice(at + brand.length)}`.replace(/\s+/g, " ").trim();
     const generic = rest.split(" ").every((w) => GENERIC_WORDS.has(fold(w)));
     if (rest.length >= 3 && !/^\d+$/.test(rest) && !generic) name = rest;
   }
+  // Ведущее «светлое/тёмное», если дальше идёт само название: «светлое классическое 3».
+  const words = name.split(" ");
+  if (words.length > 2 && ["светлое", "светлый", "тёмное", "темное", "тёмный", "темный"].includes(fold(words[0]))) {
+    name = words.slice(1).join(" ");
+  }
+  name = name.replace(/[.\-–\s]+$/g, "").trim();
   return name.slice(0, 80);
 }
 
@@ -72,18 +121,21 @@ export function toCandidate(p: OffProduct): CatalogCandidate | null {
   if (!p.code || !/^\d{6,14}$/.test(p.code)) return null;
   if (!p.product_name || !tags.some((t) => BEER_TAG.test(t))) return null;
 
-  const brand = (p.brands ?? "").split(",")[0].trim().slice(0, 60);
-  if (!brand) return null;
+  const brand = decodeEntities((p.brands ?? "").split(",")[0]).trim().slice(0, 60);
+  if (!brand || GENERIC_BRANDS.has(fold(brand))) return null;
+  if (NOT_WANTED.test(p.product_name) || NOT_WANTED.test(tags.join(" "))) return null;
   const name = cleanName(p.product_name, brand);
   if (name.length < 2 || /^\d+$/.test(name)) return null;
+  const abv = abvOf(p);
+  if (abv !== null && abv <= 0.5) return null; // безалкогольное
 
   const image = p.image_front_url;
   return {
     barcode: p.code,
     name,
     brand,
-    style: styleFrom(tags),
-    abv: abvOf(p),
+    style: styleFromTagsOrName(tags, p.product_name),
+    abv,
     country: (p.countries_tags ?? []).map((c) => COUNTRIES[c]).find(Boolean) ?? null,
     imageUrl: image && /^https?:\/\//.test(image) ? image : null,
     popularity: Number(p.unique_scans_n) || 0,
