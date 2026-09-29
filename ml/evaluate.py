@@ -16,9 +16,9 @@ from collections import Counter
 
 import numpy as np
 
-from build_gallery import embed_dataset
+from build_gallery import embed_dataset, text_vectors
 from common import DEFAULT_MODEL, DEFAULT_PRETRAINED, make_embedder
-from retrieval import DEFAULT_MARGIN, beer_scores, calibrate_threshold, decide
+from retrieval import DEFAULT_MARGIN, Gallery, beer_scores, calibrate_threshold, decide
 from build_gallery import pair_similarities
 
 
@@ -70,17 +70,17 @@ def main():
                 accepted += 1
                 accepted_right += ranked[0] == beer
 
-    if asked == 0:
-        raise SystemExit("Нечего проверять: нужно хотя бы одно пиво с двумя и более фото.")
-
-    print("\n=== Знакомое пиво (новое фото уже известной марки) ===")
-    print(f"Верное пиво первым:  {top1 / asked:.0%}")
-    print(f"Верное в первой тройке: {top3 / asked:.0%}")
-    print(f"Приложение уверенно ответило: {accepted / asked:.0%} запросов, из них верно {accepted_right / max(accepted, 1):.0%}")
+    if asked:
+        print("\n=== По эталонным фото: знакомое пиво (новое фото уже известной марки) ===")
+        print(f"Верное пиво первым:  {top1 / asked:.0%}")
+        print(f"Верное в первой тройке: {top3 / asked:.0%}")
+        print(f"Приложение уверенно ответило: {accepted / asked:.0%} запросов, из них верно {accepted_right / max(accepted, 1):.0%}")
+    else:
+        print("\nПо эталонным фото проверять нечего: нужно хотя бы одно пиво с двумя и более фото.")
 
     # Чужое пиво: убираем его целиком, галерея не должна на него «клюнуть».
     rejected = strangers = 0
-    for beer in range(n):
+    for beer in range(n if asked else 0):
         rows = np.where((beer_idx == beer) & (~is_aug))[0]
         others = beer_idx != beer
         if not others.any():
@@ -90,8 +90,38 @@ def main():
             ok, _ = decide(scores, threshold, args.margin)
             strangers += 1
             rejected += not ok
-    print("\n=== Незнакомое пиво (такой марки в галерее нет) ===")
-    print(f"Приложение честно сказало «не знаю»: {rejected / max(strangers, 1):.0%}")
+    if strangers:
+        print("\n=== По эталонным фото: незнакомое пиво (такой марки в галерее нет) ===")
+        print(f"Приложение честно сказало «не знаю»: {rejected / max(strangers, 1):.0%}")
+
+    # Только по названию: фото как запрос, эталонных фото нет вообще (так узнаются пива без снимков).
+    text_emb, text_idx = text_vectors(embedder, beers)
+    by_name = Gallery(np.zeros((0, text_emb.shape[1]), dtype=np.float32), np.zeros(0, dtype=np.int32), beers, {
+        "text_logit_scale": embedder.text_logit_scale, "text_min_sim": embedder.text_min_sim}, text_emb, text_idx)
+    originals = np.where(~is_aug)[0]
+    if len(originals):
+        own_sims = np.array([emb[i] @ text_emb[beer_idx[i]] for i in originals])
+        low, high = embedder.text_sim_bounds
+        min_sim = float(np.clip(np.percentile(own_sims, 10) - 0.01, low, high)) if len(originals) >= 5 else embedder.text_min_sim
+        t1 = t3 = t_ok = t_ok_right = t_strangers_rejected = 0
+        for q in originals:
+            beer = int(beer_idx[q])
+            ok, found = by_name.by_text(emb[q], min_sim)
+            ranked = [b for b, _ in found]
+            t1 += bool(ranked) and ranked[0] == beer
+            t3 += beer in ranked
+            if ok:
+                t_ok += 1
+                t_ok_right += ranked[0] == beer
+            mask = text_idx != beer  # то же фото, но пива нет среди названий
+            ok_without, _ = by_name.by_text(emb[q], min_sim, mask)
+            t_strangers_rejected += not ok_without
+        total = len(originals)
+        print(f"\n=== Только по названию, без эталонных фото (проверка на {total} фото) ===")
+        print(f"Верное пиво первым: {t1 / total:.0%}, в первой тройке: {t3 / total:.0%}")
+        print(f"Уверенно ответило: {t_ok / total:.0%} запросов, из них верно {t_ok_right / max(t_ok, 1):.0%}")
+        print(f"Незнакомое пиво отвергнуто: {t_strangers_rejected / total:.0%}")
+        print("(Фото из базы «студийные», на снимках с телефона цифры обычно ниже.)")
 
     print("\n=== По маркам (сколько запросов / верно первым) ===")
     for i, b in enumerate(beers):

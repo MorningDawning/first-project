@@ -43,28 +43,91 @@ def decide(scores: np.ndarray, threshold: float, margin: float) -> tuple[bool, l
     return best >= threshold and (best - runner_up) >= margin, candidates
 
 
+TEXT_PROB = 0.6        # вероятность лучшего названия, с которой считаем «узнали по названию»
+TEXT_LEAD = 0.2        # и на сколько она должна превосходить вероятность второго названия
+TEXT_SUGGEST_PROB = 0.25  # с какой вероятности показывать вариант в «возможно, это…»
+SUGGEST_BELOW = 0.08   # варианты по фото: чуть ниже порога «узнали»
+
+
+def text_probabilities(query: np.ndarray, text_embeddings: np.ndarray, scale: float):
+    """Сходство фото с названиями пив (и с «посторонними» подписями вроде «фото комнаты») → вероятности."""
+    sims = text_embeddings @ query
+    logits = (sims - sims.max()) * scale
+    probs = np.exp(logits)
+    return sims, probs / probs.sum()
+
+
 class Gallery:
-    def __init__(self, embeddings: np.ndarray, beer_index: np.ndarray, beers: list[dict], meta: dict):
+    def __init__(
+        self,
+        embeddings: np.ndarray,
+        beer_index: np.ndarray,
+        beers: list[dict],
+        meta: dict,
+        text_embeddings: np.ndarray | None = None,
+        text_beer_index: np.ndarray | None = None,
+    ):
         self.embeddings = embeddings
         self.beer_index = beer_index
         self.beers = beers
         self.meta = meta
         self.threshold = float(meta.get("threshold", DEFAULT_THRESHOLD))
         self.margin = float(meta.get("margin", DEFAULT_MARGIN))
+        self.text_embeddings = text_embeddings
+        self.text_beer_index = text_beer_index
+        self.text_scale = float(meta.get("text_logit_scale", 100.0))
+        self.text_min_sim = float(meta.get("text_min_sim", 0.22))
 
     @classmethod
     def load(cls, base: str | pathlib.Path) -> "Gallery":
         base = pathlib.Path(base)
         data = np.load(base.with_suffix(".npz"))
         meta = json.loads(base.with_suffix(".json").read_text(encoding="utf-8"))
-        return cls(data["embeddings"], data["beer_index"], meta["beers"], meta)
+        has_text = "text_embeddings" in data.files
+        return cls(
+            data["embeddings"],
+            data["beer_index"],
+            meta["beers"],
+            meta,
+            data["text_embeddings"] if has_text else None,
+            data["text_beer_index"] if has_text else None,
+        )
+
+    def by_text(self, embedding: np.ndarray, min_sim: float | None = None, mask: np.ndarray | None = None):
+        """Узнаём по названию: (узнали?, [(индекс пива, вероятность)])."""
+        if self.text_embeddings is None or len(self.text_embeddings) == 0:
+            return False, []
+        text, index = self.text_embeddings, self.text_beer_index
+        if mask is not None:
+            text, index = text[mask], index[mask]
+        sims, probs = text_probabilities(embedding, text, self.text_scale)
+        order = np.argsort(-probs)
+        ranked = [(int(index[i]), float(probs[i]), float(sims[i])) for i in order[:5]]
+        suggestions = [(b, p) for b, p, _ in ranked if b >= 0 and p >= TEXT_SUGGEST_PROB][:3]
+        best_beer, best_prob, best_sim = ranked[0]
+        limit = self.text_min_sim if min_sim is None else min_sim
+        runner_up = ranked[1][1] if len(ranked) > 1 else 0.0
+        recognized = best_beer >= 0 and best_prob >= TEXT_PROB and best_prob - runner_up >= TEXT_LEAD and best_sim >= limit
+        return recognized, suggestions
 
     def recognize(self, embedding: np.ndarray, threshold: float | None = None, margin: float | None = None):
-        scores = beer_scores(embedding, self.embeddings, self.beer_index, len(self.beers))
-        recognized, candidates = decide(
-            scores, self.threshold if threshold is None else threshold, self.margin if margin is None else margin
-        )
-        return recognized, [(self.beers[c.index], c.score) for c in candidates]
+        """(узнали?, [(пиво, уверенность)]). Сначала сверяем с эталонными фото, затем с названиями."""
+        limit = self.threshold if threshold is None else threshold
+        found: list[tuple[int, float]] = []
+        if len(self.embeddings):
+            scores = beer_scores(embedding, self.embeddings, self.beer_index, len(self.beers))
+            ok, candidates = decide(scores, limit, self.margin if margin is None else margin)
+            if ok:
+                return True, [(self.beers[c.index], c.score) for c in candidates]
+            found = [(c.index, c.score) for c in candidates if c.score >= limit - SUGGEST_BELOW]
+
+        ok, text_found = self.by_text(embedding)
+        if ok:
+            return True, [(self.beers[b], p) for b, p in text_found]
+        merged = {b: s for b, s in text_found}
+        merged.update(dict(found))
+        ranked = sorted(merged.items(), key=lambda kv: kv[1], reverse=True)[:3]
+        return False, [(self.beers[b], s) for b, s in ranked]
 
 
 def calibrate_threshold(same: np.ndarray, different: np.ndarray) -> tuple[float, str]:

@@ -16,7 +16,9 @@
     "bootstrap": "tsx prisma/bootstrap.ts",
     "dev:local": "node scripts/local.js tsx watch src/index.ts",
     "seed:local": "node scripts/local.js tsx prisma/seed.ts",
-    "seed:social:local": "node scripts/local.js tsx prisma/seedSocial.ts"
+    "seed:social:local": "node scripts/local.js tsx prisma/seedSocial.ts",
+    "export-labels": "tsx src/scripts/exportLabels.ts",
+    "export-labels:local": "node scripts/local.js tsx src/scripts/exportLabels.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

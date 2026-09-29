@@ -60,7 +60,7 @@ scanRouter.post("/", requireAuth, upload.single("photo"), async (req, res) => {
         if (match) found.push({ beer: match, confidence: candidate.confidence });
       }
       if (ml.recognized && found[0]) beer = found[0].beer;
-      else suggestions = found.filter((f) => f.confidence >= 0.6).map((f) => ({
+      else suggestions = found.filter((f) => f.confidence >= 0.25).map((f) => ({
         id: f.beer.id, name: f.beer.name, breweryName: f.beer.brewery.name, style: f.beer.style,
       }));
     }

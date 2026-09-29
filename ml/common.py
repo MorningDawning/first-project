@@ -71,11 +71,19 @@ def augment_image(image: Image.Image, rng: random.Random) -> Image.Image:
 # ---------- эмбеддинги ----------
 
 class Embedder:
-    """Превращает картинки в нормированные векторы: похожие картинки — близкие векторы."""
+    """Превращает картинки и тексты в нормированные векторы: близкий смысл — близкие векторы."""
 
     name = "base"
+    # Как резко из сходств «картинка—текст» получаются вероятности, и с какого сходства картинку вообще
+    # можно считать подходящей к тексту. Для CLIP это стандартные значения; см. build_gallery.py.
+    text_logit_scale = 100.0
+    text_min_sim = 0.22
+    text_sim_bounds = (0.15, 0.32)
 
     def embed(self, images: list[Image.Image]) -> np.ndarray:  # (n, d), длина каждой строки = 1
+        raise NotImplementedError
+
+    def embed_text(self, texts: list[str]) -> np.ndarray:
         raise NotImplementedError
 
 
@@ -87,6 +95,7 @@ class ClipEmbedder(Embedder):
         self._torch = torch
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.name = f"clip:{model}/{pretrained}"
+        self._model_name = model
         print(f"Загружаем CLIP ({model}/{pretrained}) на {self.device}... первый раз скачиваются веса, это несколько минут.")
         net, _, self._preprocess = open_clip.create_model_and_transforms(model, pretrained=pretrained)
         self._model = net.to(self.device).eval()
@@ -102,11 +111,29 @@ class ClipEmbedder(Embedder):
             out.append(vectors.cpu().numpy())
         return np.concatenate(out).astype(np.float32) if out else np.zeros((0, 1), dtype=np.float32)
 
+    def embed_text(self, texts: list[str]) -> np.ndarray:
+        torch = self._torch
+        if not hasattr(self, "_tokenizer"):
+            import open_clip
+
+            self._tokenizer = open_clip.get_tokenizer(self._model_name)
+        with torch.no_grad():
+            vectors = self._model.encode_text(self._tokenizer(texts).to(self.device))
+            vectors = vectors / vectors.norm(dim=-1, keepdim=True)
+        return vectors.cpu().numpy().astype(np.float32)
+
 
 class StubEmbedder(Embedder):
     """Простой встроенный «эмбеддер» без нейросети (цвета и грубая картинка). Только для тестов пайплайна."""
 
     name = "stub"
+    text_logit_scale = 60.0
+    text_min_sim = 0.5
+    text_sim_bounds = (0.3, 0.95)
+
+    def embed_text(self, texts: list[str]) -> np.ndarray:
+        """Текст «рисуем» на картинке и берём её вектор: так тест может проверить путь «фото → название»."""
+        return self.embed([render_text(t) for t in texts])
 
     def embed(self, images: list[Image.Image]) -> np.ndarray:
         vectors = []
@@ -115,6 +142,16 @@ class StubEmbedder(Embedder):
             vector = small - small.mean()
             vectors.append(vector / (np.linalg.norm(vector) + 1e-9))
         return np.stack(vectors).astype(np.float32)
+
+
+def render_text(text: str, size=(160, 260)) -> Image.Image:
+    """Только для тестов: картинка с надписью."""
+    from PIL import ImageDraw, ImageFont
+
+    image = Image.new("RGB", size, (255, 255, 255))
+    font = ImageFont.load_default(size=16)
+    ImageDraw.Draw(image).multiline_text((4, 4), "\n".join(text.split()[:14]), fill=(0, 0, 0), font=font, spacing=2)
+    return image
 
 
 def make_embedder(kind: str = "clip", model: str = DEFAULT_MODEL, pretrained: str = DEFAULT_PRETRAINED) -> Embedder:

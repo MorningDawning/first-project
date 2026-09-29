@@ -21,6 +21,38 @@ import numpy as np
 from common import DEFAULT_MODEL, DEFAULT_PRETRAINED, augment_image, list_photos, load_labels, make_embedder, open_image
 from retrieval import DEFAULT_MARGIN, calibrate_threshold
 
+# Как описываем пиво словами: CLIP хорошо понимает «фото банки такой-то марки» и читает крупные надписи.
+TEXT_TEMPLATES = [
+    "a photo of a can of {name} beer",
+    "a photo of a bottle of {name} beer",
+    "the label of {name} beer",
+]
+# «Посторонние» подписи: фото, которое ближе к ним, чем к любому пиву, не считаем пивом из каталога.
+GENERIC_PROMPTS = [
+    "a photo of a person", "a photo of a room", "a photo of a street", "a photo of a table",
+    "a photo of food", "a photo of a glass of beer", "a photo of a bottle of water",
+    "a photo of a can of soda", "a photo of wine", "a blurry photo", "a screenshot", "a photo of a wall",
+]
+
+
+def beer_prompts(beer: dict) -> list[str]:
+    name = f"{beer['brewery']} {beer['beer']}".strip()
+    return [t.format(name=name) for t in TEXT_TEMPLATES]
+
+
+def text_vectors(embedder, beers: list[dict]):
+    """По одному вектору на пиво (среднее по шаблонам) + «посторонние» подписи. Возвращает (векторы, индекс пива или -1)."""
+    prompts = [p for b in beers for p in beer_prompts(b)]
+    raw = embedder.embed_text(prompts).reshape(len(beers), len(TEXT_TEMPLATES), -1) if beers else None
+    vectors, index = [], []
+    if raw is not None:
+        mean = raw.mean(axis=1)
+        vectors.append(mean / (np.linalg.norm(mean, axis=1, keepdims=True) + 1e-9))
+        index += list(range(len(beers)))
+    vectors.append(embedder.embed_text(GENERIC_PROMPTS))
+    index += [-1] * len(GENERIC_PROMPTS)
+    return np.concatenate(vectors).astype(np.float32), np.array(index, dtype=np.int32)
+
 
 def embed_dataset(data_dir: pathlib.Path, embedder, augment_count: int, rng: random.Random):
     """Возвращает эмбеддинги (оригиналы и искажённые копии), индекс пива, номер исходного фото, флаг «копия» и список пив."""
@@ -30,11 +62,11 @@ def embed_dataset(data_dir: pathlib.Path, embedder, augment_count: int, rng: ran
     for slug, label in labels.items():
         photos = [(p, open_image(p)) for p in list_photos(data_dir / slug)]
         photos = [(p, im) for p, im in photos if im is not None]
-        if not photos:
-            print(f"  [нет фото] {slug} ({label['beer']})")
-            continue
         index = len(beers)
         beers.append({"key": slug, "beer": label["beer"], "brewery": label["brewery"], "photos": len(photos)})
+        if not photos:  # такое пиво узнаём только по названию (см. text_vectors)
+            print(f"  {slug}: фото нет, будет узнаваться по названию")
+            continue
         print(f"  {slug}: {len(photos)} фото × {1 + augment_count}")
 
         images, flags, ids = [], [], []
@@ -52,8 +84,10 @@ def embed_dataset(data_dir: pathlib.Path, embedder, augment_count: int, rng: ran
         photo_id += ids
         is_aug += flags
 
+    if not beers:
+        raise SystemExit("В dataset/labels.json нет ни одного пива.")
     if not vectors:
-        raise SystemExit("В dataset/ нет ни одного фото. Положите фото по dataset/README.md или запустите fetch_off_photos.py")
+        vectors = [np.zeros((0, embedder.embed_text(["x"]).shape[1]), dtype=np.float32)]
     return (
         np.concatenate(vectors),
         np.array(beer_index, dtype=np.int32),
@@ -93,19 +127,45 @@ def main():
 
     same, different = pair_similarities(embeddings, beer_index, photo_id, is_aug)
     threshold, note = calibrate_threshold(same, different)
-    print(f"\nПив в галерее: {len(beers)}, векторов: {len(embeddings)}")
+    with_photos = sum(1 for b in beers if b["photos"] > 0)
+    print(f"\nПив в каталоге: {len(beers)}, из них с фото: {with_photos}, векторов фото: {len(embeddings)}")
     if len(same):
         print(f"Сходство фото одного пива: обычно {np.percentile(same, 10):.2f}–{np.percentile(same, 90):.2f}")
     if len(different):
         print(f"Сходство фото разных пив: обычно {np.percentile(different, 10):.2f}–{np.percentile(different, 95):.2f}")
-    print(f"Порог «узнали»: {threshold:.2f} ({note})")
+    print(f"Порог «узнали по фото»: {threshold:.2f} ({note})")
+
+    print("Считаем векторы названий (для пив без фото и как запасной путь)...")
+    text_emb, text_index = text_vectors(embedder, beers)
+    # Порог «фото подходит к названию» подбираем по своим фото, если они есть.
+    text_min_sim = embedder.text_min_sim
+    originals = np.where(~is_aug)[0]
+    if len(originals):
+        own = np.array([embeddings[i] @ text_emb[beer_index[i]] for i in originals])
+        if len(own) >= 5:
+            low, high = embedder.text_sim_bounds
+            text_min_sim = float(np.clip(np.percentile(own, 10) - 0.01, low, high))
+            print(f"Порог «фото подходит к названию»: {text_min_sim:.2f} (по {len(own)} фото)")
 
     out = pathlib.Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(out.with_suffix(".npz"), embeddings=embeddings, beer_index=beer_index)
+    np.savez_compressed(
+        out.with_suffix(".npz"),
+        embeddings=embeddings,
+        beer_index=beer_index,
+        text_embeddings=text_emb,
+        text_beer_index=text_index,
+    )
     out.with_suffix(".json").write_text(
         json.dumps(
-            {"embedder": embedder.name, "threshold": threshold, "margin": args.margin, "beers": beers},
+            {
+                "embedder": embedder.name,
+                "threshold": threshold,
+                "margin": args.margin,
+                "text_logit_scale": embedder.text_logit_scale,
+                "text_min_sim": text_min_sim,
+                "beers": beers,
+            },
             ensure_ascii=False,
             indent=2,
         ),

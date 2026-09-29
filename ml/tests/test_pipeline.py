@@ -132,7 +132,7 @@ def test_evaluate_runs(dataset):
         [sys.executable, "evaluate.py", "--data", str(dataset), "--embedder", "stub", "--augment-count", "3"],
         cwd=ML_DIR, check=True, capture_output=True, text=True,
     )
-    assert "Знакомое пиво" in result.stdout and "Незнакомое пиво" in result.stdout
+    assert "знакомое пиво" in result.stdout and "Только по названию" in result.stdout
     top1 = [line for line in result.stdout.splitlines() if line.startswith("Верное пиво первым")][0]
     assert int(top1.split(":")[1].strip().rstrip("%")) >= 80
 
@@ -173,3 +173,52 @@ def test_fetch_off_photos(tmp_path):
     files = sorted(p.name for p in (root / "blue-ipa").iterdir())
     assert files == ["SOURCES.txt", "off-111.jpg"], files  # чужая пивоварня и другое пиво не подошли
     assert "openfoodfacts.org/product/111" in (root / "blue-ipa" / "SOURCES.txt").read_text(encoding="utf-8")
+
+
+def test_beer_without_photos_is_listed_and_has_name_vector(dataset, tmp_path):
+    """Пиво без единого фото попадает в галерею и получает вектор названия (смысл сходства проверяет только настоящий CLIP)."""
+    from retrieval import Gallery
+
+    labels = json.loads((dataset / "labels.json").read_text(encoding="utf-8"))
+    labels["no-photo-beer"] = {"beer": "Zeta Amber", "brewery": "Ghost Brewery"}
+    (dataset / "no-photo-beer").mkdir()
+    (dataset / "labels.json").write_text(json.dumps(labels), encoding="utf-8")
+
+    out = tmp_path / "gallery"
+    build(dataset, out)
+    gallery = Gallery.load(out)
+    ghost = [i for i, b in enumerate(gallery.beers) if b["photos"] == 0]
+    assert len(ghost) == 1 and gallery.beers[ghost[0]]["key"] == "no-photo-beer"
+    assert (gallery.text_beer_index == ghost[0]).sum() == 1
+    assert (gallery.text_beer_index == -1).sum() > 0  # «посторонние» подписи
+
+
+def test_name_matching_logic_with_synthetic_vectors():
+    """Правила «узнали по названию»: явный лидер узнаётся; близко к постороннему, слабое сходство или ничья — нет."""
+    from retrieval import Gallery
+
+    rng = np.random.default_rng(0)
+    dim = 64
+    unit = lambda v: v / np.linalg.norm(v)
+    beers = [{"key": f"b{i}", "beer": f"Beer {i}", "brewery": "X", "photos": 0} for i in range(4)]
+    names = np.stack([unit(rng.normal(size=dim)) for _ in range(4)])
+    generic = np.stack([unit(rng.normal(size=dim)) for _ in range(3)])
+    text = np.concatenate([names, generic]).astype(np.float32)
+    index = np.array([0, 1, 2, 3, -1, -1, -1], dtype=np.int32)
+    meta = {"text_logit_scale": 100.0, "text_min_sim": 0.22}
+    gallery = Gallery(np.zeros((0, dim), dtype=np.float32), np.zeros(0, dtype=np.int32), beers, meta, text, index)
+
+    near = lambda v: unit(v + 0.15 * rng.normal(size=dim) / np.sqrt(dim))
+
+    ok, found = gallery.recognize(near(names[2]))
+    assert ok and found[0][0]["key"] == "b2"
+
+    ok, _ = gallery.recognize(near(generic[1]))  # похоже на «посторонний» снимок
+    assert not ok
+
+    ok, _ = gallery.recognize(unit(rng.normal(size=dim)))  # ни на что не похоже
+    assert not ok
+
+    tie = unit(names[0] + names[1])  # два пива одинаково подходят
+    ok, found = gallery.recognize(tie)
+    assert not ok and {f[0]["key"] for f in found} >= {"b0", "b1"}
