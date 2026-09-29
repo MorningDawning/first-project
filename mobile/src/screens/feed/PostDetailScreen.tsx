@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
@@ -34,6 +34,11 @@ export function PostDetailScreen({ route, navigation }: Props) {
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<PostComment | null>(null);
   const [sending, setSending] = useState(false);
+  const listRef = useRef<FlatList<PostComment>>(null);
+  const nearBottom = useRef(false);
+  const contentHeight = useRef(0);
+  const viewportHeight = useRef(0);
+  const pendingScrollId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -53,6 +58,20 @@ export function PostDetailScreen({ route, navigation }: Props) {
       load();
     }, [load])
   );
+
+  // Свой новый комментарий или ответ подводит экран к нему, как в мессенджере.
+  useEffect(() => {
+    const id = pendingScrollId.current;
+    if (!id) return;
+    const index = comments.findIndex((c) => c.id === id);
+    if (index < 0) return;
+    pendingScrollId.current = null;
+    const timer = setTimeout(() => {
+      if (index === comments.length - 1) listRef.current?.scrollToEnd({ animated: true });
+      else listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [comments]);
 
   async function toggleLike() {
     if (!post) return;
@@ -98,6 +117,11 @@ export function PostDetailScreen({ route, navigation }: Props) {
 
   function startReply(c: PostComment) {
     setReplyTo(c);
+    // Когда поднимется клавиатура, комментарий, на который отвечаешь, остаётся на виду.
+    const index = comments.findIndex((x) => x.id === c.id);
+    if (index >= 0) {
+      setTimeout(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 }), 350);
+    }
     // Ответ на ответ привязывается к корневому комментарию, поэтому обращаемся по имени.
     if (c.parentId && !text) setText(`${c.user.name.split(" ")[0]}, `);
   }
@@ -107,9 +131,10 @@ export function PostDetailScreen({ route, navigation }: Props) {
     if (!body || sending || !post) return;
     setSending(true);
     try {
-      await postsApi.addComment(post.id, body, replyTo ? replyTo.parentId ?? replyTo.id : undefined);
+      const created = await postsApi.addComment(post.id, body, replyTo ? replyTo.parentId ?? replyTo.id : undefined);
       setText("");
       setReplyTo(null);
+      pendingScrollId.current = created.id;
       await load();
     } catch (e) {
       Alert.alert("Не получилось отправить", apiErrorMessage(e));
@@ -207,7 +232,29 @@ export function PostDetailScreen({ route, navigation }: Props) {
 
       <Animated.View ref={kb.ref} collapsable={false} style={[{ flex: 1 }, kb.style]}>
         <FlatList
+          ref={listRef}
           data={comments}
+          onScroll={(e) => {
+            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+            nearBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
+          }}
+          scrollEventThrottle={100}
+          onContentSizeChange={(_w, h) => {
+            contentHeight.current = h;
+          }}
+          // Когда поднимается клавиатура, список сжимается: если читатель был внизу
+          // (или всё помещалось на экране), последние комментарии остаются перед глазами.
+          onLayout={(e) => {
+            const prev = viewportHeight.current;
+            viewportHeight.current = e.nativeEvent.layout.height;
+            if (nearBottom.current || (prev > 0 && contentHeight.current <= prev + 1)) {
+              listRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
+          onScrollToIndexFailed={(info) => {
+            listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+            setTimeout(() => listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 }), 150);
+          }}
           keyExtractor={(c) => c.id}
           ListHeaderComponent={header}
           contentContainerStyle={styles.list}
