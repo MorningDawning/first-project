@@ -17,6 +17,7 @@ export type FeedStackParamList = {
   Compose: { beerId?: string } | undefined;
   UserProfile: { userId: string };
   FriendRequests: undefined;
+  PeopleSearch: undefined;
   Dialogs: undefined;
   Chat: { chatId: string };
   NewMessage: undefined;

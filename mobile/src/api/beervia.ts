@@ -10,6 +10,7 @@ import {
   FeedPage,
   FeedPost,
   FriendItem,
+  PersonSearchResult,
   FriendRequest,
   FriendStatus,
   PostComment,
@@ -142,6 +143,8 @@ export const profilesApi = {
   bar: (id: string) => api.get<UserBarItem[]>(`/users/${id}/bar`).then((r) => r.data),
   posts: (id: string) => api.get<FeedPost[]>(`/users/${id}/posts`).then((r) => r.data),
   report: (id: string, reason?: string) => api.post(`/users/${id}/report`, { reason }).then((r) => r.data),
+  search: (q: string) =>
+    api.get<PersonSearchResult[]>("/users/search", { params: { q } }).then((r) => r.data),
 };
 
 export const uploadsApi = {

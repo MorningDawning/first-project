@@ -123,6 +123,12 @@ export type SimilarPerson = {
   requestId: string | null;
 };
 
+export type PersonSearchResult = SimilarPerson & {
+  city: string | null;
+  mutualFriends: number;
+  match: number | null;
+};
+
 export type PublicProfile = UserBrief & {
   bio: string | null;
   city: string | null;

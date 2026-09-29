@@ -6,6 +6,7 @@ import { PostDetailScreen } from "../screens/feed/PostDetailScreen";
 import { ComposeScreen } from "../screens/feed/ComposeScreen";
 import { UserProfileScreen } from "../screens/feed/UserProfileScreen";
 import { FriendRequestsScreen } from "../screens/feed/FriendRequestsScreen";
+import { PeopleSearchScreen } from "../screens/feed/PeopleSearchScreen";
 import { DialogsScreen } from "../screens/feed/DialogsScreen";
 import { ChatScreen } from "../screens/feed/ChatScreen";
 import { NewMessageScreen } from "../screens/feed/NewMessageScreen";
@@ -30,6 +31,7 @@ export function FeedNavigator() {
       <Stack.Screen name="Compose" component={ComposeScreen} options={{ presentation: "modal" }} />
       <Stack.Screen name="UserProfile" component={UserProfileScreen} />
       <Stack.Screen name="FriendRequests" component={FriendRequestsScreen} />
+      <Stack.Screen name="PeopleSearch" component={PeopleSearchScreen} />
       <Stack.Screen name="Dialogs" component={DialogsScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="NewMessage" component={NewMessageScreen} />

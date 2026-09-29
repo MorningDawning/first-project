@@ -177,6 +177,9 @@ export function FeedScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Лента</Text>
         <View style={styles.headerButtons}>
+          <Pressable onPress={() => navigation.navigate("PeopleSearch")} style={styles.messagesBtn} hitSlop={6}>
+            <Icon name="search" color={colors.text} size={22} />
+          </Pressable>
           <Pressable onPress={() => navigation.navigate("Compose")} style={styles.plusBtn} hitSlop={6}>
             <Icon name="plus" color={colors.background} size={22} strokeWidth={2.75} />
           </Pressable>

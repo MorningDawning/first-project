@@ -3,19 +3,88 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { wrap } from "../lib/asyncHandler";
-import { computeUserTasteProfile } from "../lib/taste";
+import { computeUserTasteProfile, matchPercent } from "../lib/taste";
 import {
   areFriends,
   compareTaste,
   ensureUsername,
   friendIdsOf,
   isOnline,
+  mutualFriendCounts,
   postInclude,
   relationTo,
+  relationsTo,
   serializePost,
+  userBrief,
 } from "../lib/social";
 
 export const profilesRouter = Router();
+
+const SEARCH_LIMIT = 20;
+
+// SQLite сравнивает без учёта регистра только латиницу, поэтому имена приводим к нижнему регистру сами.
+const fold = (text: string) => text.toLowerCase().replace(/ё/g, "е");
+
+// GET /users/search?q= — люди по имени или @нику. «@ник» ищет только среди ников.
+profilesRouter.get("/search", requireAuth, wrap(async (req, res) => {
+  const me = req.userId!;
+  const raw = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 40) : "";
+  const handleOnly = raw.startsWith("@");
+  const q = fold(raw.replace(/^@+/, "").trim());
+  if (q.length < 2) return res.json([]);
+  const tokens = q.split(/\s+/);
+
+  const users = await prisma.user.findMany({ where: { id: { not: me } }, select: { id: true, name: true, username: true } });
+
+  // 0 — ник совпал целиком, 1 — начало слова имени или ника, 2 — вхождение где угодно
+  const scored: { id: string; rank: number; name: string }[] = [];
+  for (const u of users) {
+    const name = fold(u.name);
+    const handle = u.username?.toLowerCase() ?? "";
+    let rank: number | null = null;
+    if (handle && handle === q) rank = 0;
+    else if (handleOnly) rank = handle.startsWith(q) ? 1 : handle.includes(q) ? 2 : null;
+    else {
+      const words = name.split(/\s+/);
+      if (tokens.every((t) => words.some((w) => w.startsWith(t))) || (handle && handle.startsWith(q))) rank = 1;
+      else if (name.includes(q) || handle.includes(q)) rank = 2;
+    }
+    if (rank !== null) scored.push({ id: u.id, rank, name: u.name });
+  }
+  scored.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name, "ru"));
+  const top = scored.slice(0, SEARCH_LIMIT);
+  if (top.length === 0) return res.json([]);
+
+  const ids = top.map((t) => t.id);
+  const [found, relations, myFriends, myProfile] = await Promise.all([
+    prisma.user.findMany({ where: { id: { in: ids } } }),
+    relationsTo(me, ids),
+    friendIdsOf(me),
+    computeUserTasteProfile(me),
+  ]);
+  const [mutual, profiles] = await Promise.all([
+    mutualFriendCounts(new Set(myFriends), ids),
+    Promise.all(ids.map((id) => computeUserTasteProfile(id))),
+  ]);
+  const byId = new Map(found.map((u) => [u.id, u]));
+
+  res.json(
+    await Promise.all(
+      ids.map(async (id, i) => {
+        const user = await ensureUsername(byId.get(id)!);
+        const relation = relations.get(id)!;
+        return {
+          user: userBrief(user),
+          city: user.city,
+          match: myProfile && profiles[i] ? matchPercent(myProfile, profiles[i]!) : null,
+          friendStatus: relation.status,
+          requestId: relation.requestId,
+          mutualFriends: mutual.get(id) ?? 0,
+        };
+      })
+    )
+  );
+}));
 
 // GET /users/:id — чужой профиль: совпадение вкуса со мной, статус дружбы, счётчики.
 profilesRouter.get("/:id", requireAuth, wrap(async (req, res) => {
