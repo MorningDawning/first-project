@@ -11,7 +11,9 @@
     "prisma:migrate": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
     "seed:social": "tsx prisma/seedSocial.ts",
-    "sync-photos": "tsx src/scripts/syncBeerPhotos.ts"
+    "sync-photos": "tsx src/scripts/syncBeerPhotos.ts",
+    "start:prod": "prisma migrate deploy && tsx prisma/bootstrap.ts && node dist/index.js",
+    "bootstrap": "tsx prisma/bootstrap.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -22,8 +24,10 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.0",
+    "express-rate-limit": "^7.5.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.4.0",
+    "prisma": "^5.22.0",
     "ws": "^8.22.0",
     "zod": "^3.23.8"
   },
@@ -35,7 +39,6 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^22.7.4",
     "@types/ws": "^8.18.2",
-    "prisma": "^5.20.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
   }

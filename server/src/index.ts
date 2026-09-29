@@ -2,6 +2,8 @@ import "dotenv/config";
 import path from "path";
 import cors from "cors";
 import express from "express";
+import rateLimit from "express-rate-limit";
+import { prisma } from "./lib/prisma";
 import { authRouter } from "./routes/auth";
 import { usersRouter } from "./routes/users";
 import { beersRouter } from "./routes/beers";
@@ -28,10 +30,37 @@ process.on("unhandledRejection", (reason) => {
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+// За прокси хостинга (Render и подобные) настоящий адрес клиента приходит в заголовке;
+// без этого ограничение по IP считало бы всех людей одним.
+app.set("trust proxy", 1);
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.use(cors());
+app.use(express.json({ limit: "100kb" }));
+
+// Проверка для хостинга: сервер жив и база отвечает.
+app.get("/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ ok: true });
+  } catch {
+    res.status(503).json({ ok: false });
+  }
+});
+
+// Защита от подбора паролей и массовой регистрации. Только на боевом сервере,
+// чтобы не мешать своим проверкам при разработке.
+if (process.env.NODE_ENV === "production") {
+  app.use(
+    ["/auth/login", "/auth/register"],
+    rateLimit({
+      windowMs: 15 * 60_000,
+      limit: 30,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: "Слишком много попыток. Попробуйте через несколько минут." },
+    })
+  );
+}
 
 // Реальные фото пива — те же, что собираются для датасета CLIP (см. /ml).
 // beer.imageUrl хранит относительный путь вида "/beer-photos/<slug>/<файл>",

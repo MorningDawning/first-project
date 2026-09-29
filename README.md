@@ -42,16 +42,18 @@ ml/       — распознавание этикетки: дообучение 
 
 ## Backend (`server/`)
 
-Node.js + Express + Prisma. База данных — SQLite (файл `server/prisma/dev.db`),
-чтобы не требовать отдельного сервера БД; в проде легко переключить `DATABASE_URL`
-на PostgreSQL — схема Prisma останется той же.
+Node.js + Express + Prisma. База данных — PostgreSQL (`DATABASE_URL` в `server/.env`).
+Для разработки поднимите Postgres командой `docker compose up -d` в папке `server/`
+(см. `server/docker-compose.yml`) либо возьмите строку подключения к облачной базе.
+Как выложить сервер в интернет — в [DEPLOY.md](DEPLOY.md).
 
 ```bash
 cd server
 npm install
-npx prisma migrate dev   # создаёт БД и применяет схему
-npm run seed              # заполняет демо-данными (пиво, пивоварни, отзывы)
-npm run dev                # запускает API на http://localhost:4000
+cp .env.example .env      # и поправьте DATABASE_URL при необходимости
+npx prisma migrate dev    # создаёт таблицы
+npm run seed              # ЛОКАЛЬНО: стирает базу и заполняет демо-данными (пиво, пивоварни, отзывы)
+npm run dev               # запускает API на http://localhost:4000
 ```
 
 Демо-аккаунт: `demo@beervia.app` / `demo1234`.
@@ -126,5 +128,4 @@ Backend находит сервис через `ML_SERVICE_URL` в `server/.env`
 - **Лента друзей** — сейчас общая для всех пользователей; модель
   `Friendship` в схеме уже есть, фильтрацию по реальным друзьям можно
   добавить отдельным шагом.
-- **База данных** — SQLite для простоты разработки; для продакшена
-  переключить на PostgreSQL через `DATABASE_URL`.
+- **База данных** — PostgreSQL (локально и на хостинге).

@@ -1,6 +1,14 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+// На боевом сервере подпись токенов нельзя оставлять «по умолчанию»: зная её, любой
+// мог бы выписать себе токен от имени другого человека.
+if (IS_PRODUCTION && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 24)) {
+  throw new Error("JWT_SECRET не задан или слишком короткий (нужно не меньше 24 символов)");
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 
 export function hashPassword(password: string): Promise<string> {

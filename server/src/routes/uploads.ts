@@ -8,7 +8,10 @@ import { wrap } from "../lib/asyncHandler";
 
 export const uploadsRouter = Router();
 
-export const UPLOADS_DIR = path.join(__dirname, "..", "..", "uploads");
+// На хостинге сюда указывают папку постоянного диска (UPLOADS_DIR), иначе файлы пропадут при перезапуске.
+export const UPLOADS_DIR = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, "..", "..", "uploads");
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
 

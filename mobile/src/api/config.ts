@@ -21,7 +21,11 @@ function resolveDefaultApiUrl(): string {
   return `http://localhost:${BACKEND_PORT}`; // iOS simulator / web
 }
 
-export const API_URL = resolveDefaultApiUrl();
+// Адрес боевого сервера задаётся в mobile/.env: EXPO_PUBLIC_API_URL=https://ваш-сервер.onrender.com
+// Не задан — приложение ищет сервер на вашем компьютере (режим разработки).
+const explicitUrl = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, "");
+
+export const API_URL = explicitUrl || resolveDefaultApiUrl();
 
 /**
  * Beer/brewery photos can be relative paths like "/beer-photos/punk-ipa/001.jpg"
