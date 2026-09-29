@@ -11,7 +11,7 @@ import { MatchRing } from "../../components/MatchRing";
 import { PostCard } from "../../components/PostCard";
 import { Icon } from "../../components/icons/Icon";
 import { ErrorView, LoadingView } from "../../components/StateViews";
-import { friendsApi, postsApi, profilesApi } from "../../api/beervia";
+import { chatsApi, friendsApi, postsApi, profilesApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { plural } from "../../lib/time";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
@@ -154,7 +154,12 @@ export function UserProfileScreen({ route, navigation }: Props) {
               </View>
               {status === "friends" ? (
                 <Pressable
-                  onPress={() => navigation.navigate("Chat", { userId: profile.id })}
+                  onPress={() =>
+                    chatsApi
+                      .openDirect(profile.id)
+                      .then((chatId) => navigation.navigate("Chat", { chatId }))
+                      .catch((e) => Alert.alert("Не получилось", apiErrorMessage(e)))
+                  }
                   style={[styles.writeBtn, styles.writeOpen]}
                 >
                   <Icon name="send" color={colors.text} size={16} />

@@ -9,6 +9,8 @@ import { FriendRequestsScreen } from "../screens/feed/FriendRequestsScreen";
 import { DialogsScreen } from "../screens/feed/DialogsScreen";
 import { ChatScreen } from "../screens/feed/ChatScreen";
 import { NewMessageScreen } from "../screens/feed/NewMessageScreen";
+import { NewGroupScreen } from "../screens/feed/NewGroupScreen";
+import { GroupInfoScreen } from "../screens/feed/GroupInfoScreen";
 import { BeerDetailScreen } from "../screens/BeerDetailScreen";
 import { colors } from "../theme/colors";
 
@@ -31,6 +33,8 @@ export function FeedNavigator() {
       <Stack.Screen name="Dialogs" component={DialogsScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="NewMessage" component={NewMessageScreen} />
+      <Stack.Screen name="NewGroup" component={NewGroupScreen} />
+      <Stack.Screen name="GroupInfo" component={GroupInfoScreen} />
       <Stack.Screen name="BeerDetail" component={BeerDetailScreen} />
     </Stack.Navigator>
   );

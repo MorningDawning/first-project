@@ -15,7 +15,7 @@ import { colors, fonts } from "../theme/colors";
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // Экраны переписки и постов с полем ввода занимают весь экран — таб-бар им мешает.
-const FULLSCREEN_FEED_ROUTES = ["PostDetail", "Compose", "Dialogs", "Chat", "NewMessage"];
+const FULLSCREEN_FEED_ROUTES = ["PostDetail", "Compose", "Dialogs", "Chat", "NewMessage", "NewGroup", "GroupInfo"];
 
 type RegularTabName = Exclude<keyof MainTabParamList, "CameraTab">;
 

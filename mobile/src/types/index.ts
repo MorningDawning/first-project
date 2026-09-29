@@ -136,19 +136,34 @@ export type UserBarItem = {
   scannedAt: string;
 };
 
-export type Conversation = {
-  user: UserBrief;
-  online: boolean;
+export type ChatSummary = {
+  id: string;
+  type: "direct" | "group";
+  title: string;
+  peer: (UserBrief & { online: boolean }) | null;
+  memberCount: number;
   unread: number;
-  lastMessage: { id: string; text: string | null; beerName: string | null; fromMe: boolean; createdAt: string };
+  lastMessageAt: string;
+  lastMessage: {
+    id: string;
+    kind: "user" | "system";
+    text: string | null;
+    beerName: string | null;
+    hasPhoto: boolean;
+    senderName: string | null;
+    fromMe: boolean;
+    createdAt: string;
+  } | null;
 };
 
 export type ChatMessage = {
   id: string;
+  kind: "user" | "system";
   text: string | null;
   fromMe: boolean;
   createdAt: string;
-  readAt: string | null;
+  sender: UserBrief;
+  photo: { url: string; width: number | null; height: number | null } | null;
   beer: {
     id: string;
     name: string;
@@ -156,15 +171,29 @@ export type ChatMessage = {
     abv: number;
     imageUrl: string | null;
     brewery: { id: string; name: string };
-    matchForRecipient: number | null;
+    match: number | null;
+    matchWho: "you" | "peer" | null;
   } | null;
+  /** Личный чат: когда собеседник прочитал. */
+  readAt: string | null;
+  /** Группа: сколько из остальных участников прочитали. */
+  readBy: number;
 };
 
-export type ChatThread = {
-  peer: UserBrief & { online: boolean; match: number | null };
+export type ChatMemberInfo = UserBrief & { role: "owner" | "member"; online: boolean };
+
+export type ChatInfo = {
+  id: string;
+  type: "direct" | "group";
+  title: string;
   canSend: boolean;
-  messages: ChatMessage[];
+  myRole: "owner" | "member";
+  otherCount: number;
+  peer: (UserBrief & { online: boolean; match: number | null }) | null;
+  members: ChatMemberInfo[];
 };
+
+export type ChatThread = { chat: ChatInfo; messages: ChatMessage[] };
 
 export type UserProfile = {
   id: string;

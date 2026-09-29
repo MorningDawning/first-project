@@ -18,8 +18,10 @@ export type FeedStackParamList = {
   UserProfile: { userId: string };
   FriendRequests: undefined;
   Dialogs: undefined;
-  Chat: { userId: string };
+  Chat: { chatId: string };
   NewMessage: undefined;
+  NewGroup: { addTo?: string; exclude?: string[] } | undefined;
+  GroupInfo: { chatId: string };
   BeerDetail: { beerId: string };
 };
 

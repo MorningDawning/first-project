@@ -9,9 +9,10 @@ import { MatchRing } from "../../components/MatchRing";
 import { PostCard } from "../../components/PostCard";
 import { Icon } from "../../components/icons/Icon";
 import { EmptyView, ErrorView, LoadingView } from "../../components/StateViews";
-import { feedApi, friendsApi, messagesApi, postsApi } from "../../api/beervia";
+import { feedApi, friendsApi, chatsApi, postsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { plural } from "../../lib/time";
+import { useRealtimeEvents } from "../../lib/realtime";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
 import { FeedStackParamList } from "../../navigation/types";
 import { FeedPost, FriendRequest, FriendStatus, SimilarPerson } from "../../types";
@@ -41,7 +42,7 @@ export function FeedScreen() {
         feedApi.list("foryou"),
         feedApi.people(),
         friendsApi.requests(),
-        messagesApi.unreadCount(),
+        chatsApi.unreadCount(),
       ]);
       setUnread(unreadCount);
       setFriendsPosts(friends.posts);
@@ -62,6 +63,13 @@ export function FeedScreen() {
       refresh();
     }, [refresh])
   );
+
+  // Новые сообщения и «прочитано» приходят живыми событиями: бейдж обновляем сразу.
+  useRealtimeEvents((event) => {
+    if (event.type === "message" || event.type === "read" || event.type === "chat") {
+      chatsApi.unreadCount().then(setUnread).catch(() => {});
+    }
+  });
 
   async function loadMore() {
     if (tab !== "friends" || !nextBefore || loadingMore) return;

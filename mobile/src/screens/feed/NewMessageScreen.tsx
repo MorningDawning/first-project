@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
@@ -7,7 +7,7 @@ import { Avatar } from "../../components/Avatar";
 import { BackButton } from "../../components/BackButton";
 import { Icon } from "../../components/icons/Icon";
 import { EmptyView, ErrorView, LoadingView } from "../../components/StateViews";
-import { friendsApi } from "../../api/beervia";
+import { chatsApi, friendsApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
 import { colors, fonts, radius, spacing } from "../../theme/colors";
 import { FeedStackParamList } from "../../navigation/types";
@@ -30,6 +30,15 @@ export function NewMessageScreen() {
       .finally(() => setLoading(false));
   }, []);
 
+  async function open(friend: FriendItem) {
+    try {
+      const chatId = await chatsApi.openDirect(friend.id);
+      navigation.replace("Chat", { chatId });
+    } catch (e) {
+      Alert.alert("Не получилось", apiErrorMessage(e));
+    }
+  }
+
   const q = query.trim().toLowerCase();
   const visible = q ? friends.filter((f) => f.name.toLowerCase().includes(q)) : friends;
 
@@ -47,7 +56,6 @@ export function NewMessageScreen() {
           placeholder="Поиск по друзьям"
           placeholderTextColor={colors.textMuted}
           style={styles.searchInput}
-          autoFocus
         />
       </View>
 
@@ -61,14 +69,22 @@ export function NewMessageScreen() {
           keyExtractor={(f) => f.id}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            !q ? (
+              <Pressable onPress={() => navigation.navigate("NewGroup")} style={({ pressed }) => [styles.row, styles.groupRow, pressed && { opacity: 0.85 }]}>
+                <View style={styles.groupIcon}>
+                  <Icon name="users" color={colors.background} size={22} />
+                </View>
+                <Text style={styles.groupText}>Новая группа</Text>
+                <Icon name="chevronRight" color={colors.textMuted} size={18} strokeWidth={2.75} />
+              </Pressable>
+            ) : null
+          }
           ListEmptyComponent={
-            <EmptyView emoji="🤝" message={q ? "Никого не нашли" : "Пока нет друзей — добавь кого-нибудь во вкладке «Для тебя»"} />
+            <EmptyView emoji="🤝" message={q ? "Никого не нашли" : "Пока нет друзей. Добавь кого-нибудь во вкладке «Для тебя»"} />
           }
           renderItem={({ item }) => (
-            <Pressable
-              onPress={() => navigation.replace("Chat", { userId: item.id })}
-              style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
-            >
+            <Pressable onPress={() => open(item)} style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}>
               <View>
                 <Avatar user={item} size={48} />
                 {item.online && <View style={styles.onlineDot} />}
@@ -92,6 +108,9 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 15, color: colors.text },
   list: { padding: spacing.lg, gap: 8, flexGrow: 1 },
   row: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.card, borderRadius: 22, padding: 10 },
+  groupRow: { marginBottom: 4 },
+  groupIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  groupText: { flex: 1, fontFamily: fonts.bodyBold, fontSize: 15, color: colors.text },
   onlineDot: { position: "absolute", right: 0, bottom: 0, width: 13, height: 13, borderRadius: 7, backgroundColor: "#7A8A5E", borderWidth: 3, borderColor: colors.card },
   name: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.text },
   meta: { fontFamily: fonts.body, fontSize: 12, color: colors.success },

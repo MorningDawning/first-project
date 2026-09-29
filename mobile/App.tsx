@@ -9,6 +9,7 @@ import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "./src/context/AuthContext";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import { RealtimeProvider } from "./src/lib/realtime";
 import { colors } from "./src/theme/colors";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -37,10 +38,12 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <RootNavigator />
-        </View>
-        <StatusBar style="dark" />
+        <RealtimeProvider>
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <RootNavigator />
+          </View>
+          <StatusBar style="dark" />
+        </RealtimeProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

@@ -1,8 +1,9 @@
+import { Platform } from "react-native";
 import { api } from "./client";
 import {
   BarEntry,
+  ChatSummary,
   ChatThread,
-  Conversation,
   BeerDetail,
   BeerSummary,
   Brewery,
@@ -145,19 +146,38 @@ export const profilesApi = {
 
 export const uploadsApi = {
   /** Загружает фото для поста, возвращает относительную ссылку вида /uploads/<user>/<file>. */
-  photo: (uri: string) => {
+  photo: async (uri: string) => {
     const form = new FormData();
-    form.append("photo", { uri, name: "post.jpg", type: "image/jpeg" } as unknown as Blob);
+    if (Platform.OS === "web") {
+      // В браузере файл передаётся настоящим Blob; форма {uri, name, type} — только для телефона.
+      form.append("photo", await (await fetch(uri)).blob(), "post.jpg");
+    } else {
+      form.append("photo", { uri, name: "post.jpg", type: "image/jpeg" } as unknown as Blob);
+    }
     return api
       .post<{ url: string }>("/uploads", form, { headers: { "Content-Type": "multipart/form-data" } })
       .then((r) => r.data.url);
   },
 };
 
-export const messagesApi = {
-  conversations: () => api.get<Conversation[]>("/messages/conversations").then((r) => r.data),
-  unreadCount: () => api.get<{ count: number }>("/messages/unread-count").then((r) => r.data.count),
-  thread: (userId: string) => api.get<ChatThread>(`/messages/with/${userId}`).then((r) => r.data),
-  send: (userId: string, body: { text?: string; beerId?: string }) =>
-    api.post<{ id: string }>(`/messages/with/${userId}`, body).then((r) => r.data),
+export type OutgoingMessage = {
+  text?: string;
+  beerId?: string;
+  photo?: { url: string; width?: number; height?: number };
+};
+
+export const chatsApi = {
+  list: () => api.get<ChatSummary[]>("/chats").then((r) => r.data),
+  unreadCount: () => api.get<{ count: number }>("/chats/unread-count").then((r) => r.data.count),
+  thread: (chatId: string) => api.get<ChatThread>(`/chats/${chatId}`).then((r) => r.data),
+  openDirect: (userId: string) => api.post<{ id: string }>("/chats/direct", { userId }).then((r) => r.data.id),
+  createGroup: (title: string, memberIds: string[]) =>
+    api.post<{ id: string }>("/chats/group", { title, memberIds }).then((r) => r.data.id),
+  send: (chatId: string, message: OutgoingMessage) =>
+    api.post<{ id: string }>(`/chats/${chatId}/messages`, message).then((r) => r.data),
+  rename: (chatId: string, title: string) => api.patch(`/chats/${chatId}`, { title }).then((r) => r.data),
+  addMembers: (chatId: string, userIds: string[]) =>
+    api.post(`/chats/${chatId}/members`, { userIds }).then((r) => r.data),
+  removeMember: (chatId: string, userId: string) =>
+    api.delete(`/chats/${chatId}/members/${userId}`).then((r) => r.data),
 };
