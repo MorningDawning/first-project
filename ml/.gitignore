@@ -9,3 +9,4 @@ dataset/*/*.png
 gallery.npz
 gallery.json
 dataset/*/SOURCES.txt
+inbox/

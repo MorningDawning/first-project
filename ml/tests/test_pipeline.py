@@ -334,3 +334,27 @@ def test_pick_source_prefers_manual_front(tmp_path):
     _can_on((255, 255, 255)).save(tmp_path / "off-1.jpg")
     Image.new("RGB", (40, 60), (10, 10, 10)).save(tmp_path / "front.jpg")
     assert pick_source(tmp_path)[0].name == "front.jpg"
+
+
+def test_import_inbox_matches_names_and_places_front(dataset):
+    from import_inbox import match
+
+    labels = {
+        "baltika-7": {"beer": "7 Экспортное", "brewery": "Балтика"},
+        "baltika-9": {"beer": "9 Крепкое", "brewery": "Балтика"},
+        "amstel": {"beer": "Premium Pilsener", "brewery": "Amstel"},
+    }
+    assert match("Балтика 7 Экспортное", labels)[0] == "baltika-7"
+    assert match("amstel premium pilsener", labels)[0] == "amstel"
+    assert match("Балтика", labels)[0] is None              # неоднозначно
+    assert match("Совсем другое пиво", labels)[0] is None
+
+    inbox = dataset.parent / "inbox"
+    inbox.mkdir()
+    _can_on((255, 255, 255)).save(inbox / "Red Lager.jpg")
+    _can_on((255, 255, 255)).save(inbox / "неведомая штука.jpg")
+    result = subprocess.run([sys.executable, "import_inbox.py", "--data", str(dataset), "--inbox", str(inbox)],
+                            cwd=ML_DIR, check=True, capture_output=True, text=True)
+    assert (dataset / "red-lager" / "front.jpg").exists()
+    assert (inbox / "done" / "Red Lager.jpg").exists() and (inbox / "неведомая штука.jpg").exists()
+    assert "не разобрано" in result.stdout
