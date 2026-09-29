@@ -5,7 +5,8 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { wrap } from "../lib/asyncHandler";
-import { computeUserTasteProfile } from "../lib/taste";
+import { Prisma } from "@prisma/client";
+import { TasteVector, computeUserTasteProfile, matchPercent, tasteVector } from "../lib/taste";
 import {
   canViewPost,
   friendIdsOf,
@@ -77,44 +78,86 @@ postsRouter.delete("/:id/like", requireAuth, wrap(async (req, res) => {
   res.json(await likeState(req.params.id, me));
 }));
 
+const commentInclude = (me: string) =>
+  ({
+    user: true,
+    beer: { include: { brewery: true } },
+    _count: { select: { likes: true } },
+    likes: { where: { userId: me }, select: { userId: true } },
+  }) as const;
+
+type CommentRow = Prisma.CommentGetPayload<{ include: ReturnType<typeof commentInclude> }>;
+
+function serializeComment(c: CommentRow, me: string, postOwnerId: string, profile: TasteVector | null) {
+  return {
+    id: c.id,
+    text: c.text,
+    createdAt: c.createdAt,
+    parentId: c.parentId,
+    user: userBrief(c.user),
+    photo: c.photoUrl ? { url: c.photoUrl, width: c.photoWidth, height: c.photoHeight } : null,
+    beer: c.beer
+      ? {
+          id: c.beer.id,
+          name: c.beer.name,
+          style: c.beer.style,
+          imageUrl: c.beer.imageUrl,
+          brewery: { id: c.beer.brewery.id, name: c.beer.brewery.name },
+          matchPercent: profile ? matchPercent(profile, tasteVector(c.beer)) : null,
+        }
+      : null,
+    likeCount: c._count.likes,
+    likedByMe: c.likes.length > 0,
+    canDelete: c.userId === me || postOwnerId === me,
+  };
+}
+
 // GET /posts/:id/comments — плоский список: комментарий, сразу за ним его ответы.
 postsRouter.get("/:id/comments", requireAuth, wrap(async (req, res) => {
   const me = req.userId!;
   const post = await prisma.post.findUnique({ where: { id: req.params.id } });
   if (!post || !(await canViewPost(me, post))) return res.status(404).json({ error: "Пост не найден" });
 
-  const rows = await prisma.comment.findMany({
-    where: { postId: post.id },
-    include: {
-      user: true,
-      _count: { select: { likes: true } },
-      likes: { where: { userId: me }, select: { userId: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
-  const serialize = (c: (typeof rows)[number]) => ({
-    id: c.id,
-    text: c.text,
-    createdAt: c.createdAt,
-    parentId: c.parentId,
-    user: userBrief(c.user),
-    likeCount: c._count.likes,
-    likedByMe: c.likes.length > 0,
-    canDelete: c.userId === me || post.userId === me,
-  });
+  const [rows, profile] = await Promise.all([
+    prisma.comment.findMany({ where: { postId: post.id }, include: commentInclude(me), orderBy: { createdAt: "asc" } }),
+    computeUserTasteProfile(me),
+  ]);
+  const serialize = (c: CommentRow) => serializeComment(c, me, post.userId, profile);
   const roots = rows.filter((c) => !c.parentId);
   res.json(roots.flatMap((root) => [serialize(root), ...rows.filter((c) => c.parentId === root.id).map(serialize)]));
 }));
 
-const commentSchema = z.object({ text: z.string().trim().min(1).max(500), parentId: z.string().optional() });
+const commentSchema = z
+  .object({
+    text: z.string().trim().max(500).optional(),
+    parentId: z.string().optional(),
+    beerId: z.string().optional(),
+    photo: z
+      .object({
+        url: z.string(),
+        width: z.number().int().min(1).max(20000).optional(),
+        height: z.number().int().min(1).max(20000).optional(),
+      })
+      .optional(),
+  })
+  .refine((v) => (v.text && v.text.length > 0) || v.beerId || v.photo, { message: "empty" });
 
 postsRouter.post("/:id/comments", requireAuth, wrap(async (req, res) => {
   const me = req.userId!;
   const parsed = commentSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Напишите комментарий (до 500 символов)" });
+  if (!parsed.success) return res.status(400).json({ error: "Напишите комментарий (до 500 символов), приложите фото или пиво" });
+  const { text, beerId, photo } = parsed.data;
 
   const post = await prisma.post.findUnique({ where: { id: req.params.id } });
   if (!post || !(await canViewPost(me, post))) return res.status(404).json({ error: "Пост не найден" });
+
+  if (beerId && !(await prisma.beer.findUnique({ where: { id: beerId } }))) {
+    return res.status(404).json({ error: "Пиво не найдено" });
+  }
+  // Фото принимаем только из собственных загрузок.
+  if (photo && !new RegExp(`^/uploads/${me}/[a-f0-9]{24}\\.(jpg|png|webp)$`).test(photo.url)) {
+    return res.status(400).json({ error: "Некорректное фото" });
+  }
 
   // Один уровень вложенности: ответ на ответ привязываем к корневому комментарию.
   let parentId: string | null = null;
@@ -125,19 +168,19 @@ postsRouter.post("/:id/comments", requireAuth, wrap(async (req, res) => {
   }
 
   const comment = await prisma.comment.create({
-    data: { postId: post.id, userId: me, parentId, text: parsed.data.text },
-    include: { user: true },
+    data: {
+      postId: post.id,
+      userId: me,
+      parentId,
+      text: text ?? "",
+      beerId: beerId ?? null,
+      photoUrl: photo?.url ?? null,
+      photoWidth: photo?.width ?? null,
+      photoHeight: photo?.height ?? null,
+    },
+    include: commentInclude(me),
   });
-  res.status(201).json({
-    id: comment.id,
-    text: comment.text,
-    createdAt: comment.createdAt,
-    parentId: comment.parentId,
-    user: userBrief(comment.user),
-    likeCount: 0,
-    likedByMe: false,
-    canDelete: true,
-  });
+  res.status(201).json(serializeComment(comment, me, post.userId, await computeUserTasteProfile(me)));
 }));
 
 const reportSchema = z.object({ reason: z.string().trim().max(300).optional() });
@@ -186,5 +229,9 @@ commentsRouter.delete("/:id", requireAuth, wrap(async (req, res) => {
     return res.status(404).json({ error: "Комментарий не найден" });
   }
   await prisma.comment.delete({ where: { id: comment.id } });
+  if (comment.photoUrl) {
+    const file = path.join(UPLOADS_DIR, path.relative("/uploads", comment.photoUrl));
+    if (file.startsWith(UPLOADS_DIR)) fs.promises.unlink(file).catch(() => {});
+  }
   res.json({ ok: true });
 }));

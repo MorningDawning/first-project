@@ -78,6 +78,7 @@ model Beer {
   wishlist Wishlist[]
   posts    Post[]
   messages Message[]
+  comments Comment[]
 }
 
 model Review {
@@ -149,15 +150,20 @@ model PostLike {
 }
 
 model Comment {
-  id        String   @id @default(cuid())
-  postId    String
-  userId    String
-  parentId  String? // один уровень вложенности: ответ всегда привязан к корневому комментарию
-  text      String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  postId      String
+  userId      String
+  parentId    String? // один уровень вложенности: ответ всегда привязан к корневому комментарию
+  text        String // пустая строка, если в комментарии только фото или пиво
+  photoUrl    String?
+  photoWidth  Int?
+  photoHeight Int?
+  beerId      String? // приложенная карточка пива
+  createdAt   DateTime @default(now())
 
   post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
   user    User          @relation(fields: [userId], references: [id])
+  beer    Beer?         @relation(fields: [beerId], references: [id])
   parent  Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies Comment[]     @relation("CommentReplies")
   likes   CommentLike[]
@@ -204,20 +210,27 @@ model ConversationMember {
 }
 
 model Message {
-  id             String   @id @default(cuid())
-  conversationId String
-  senderId       String
-  kind           String   @default("user") // "user" | "system"
-  text           String?
-  beerId         String? // сообщение-карточка с пивом
-  photoUrl       String?
-  photoWidth     Int?
-  photoHeight    Int?
-  createdAt      DateTime @default(now())
+  id              String    @id @default(cuid())
+  conversationId  String
+  senderId        String
+  kind            String    @default("user") // "user" | "system"
+  text            String?
+  beerId          String? // сообщение-карточка с пивом
+  photoUrl        String?
+  photoWidth      Int?
+  photoHeight     Int?
+  audioUrl        String? // голосовое сообщение
+  audioDurationMs Int?
+  replyToId       String? // ответ на другое сообщение
+  editedAt        DateTime?
+  deletedAt       DateTime? // удалено у всех: содержимое стирается, строка остаётся для цитат
+  createdAt       DateTime  @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation(fields: [senderId], references: [id])
   beer         Beer?        @relation(fields: [beerId], references: [id])
+  replyTo      Message?     @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      Message[]    @relation("MessageReplies")
 
   @@index([conversationId, createdAt])
 }
