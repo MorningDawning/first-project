@@ -140,8 +140,12 @@ export function BeerDetailScreen() {
           </View>
         </View>
 
+        <View style={styles.heroBox}>
+          <View style={styles.heroGlow} />
+          <BeerArt name={beer.name} imageUrl={beer.imageUrl} size={190} height={270} shape="rounded" style={styles.heroImage} />
+        </View>
+
         <View style={styles.headerRow}>
-          <BeerArt name={beer.name} imageUrl={beer.imageUrl} size={96} shape="rounded" />
           <View style={styles.headerInfo}>
             <Text style={styles.name} numberOfLines={2}>{beer.name}</Text>
             <Text style={styles.brewery} numberOfLines={1}>{beer.brewery.name} · {beer.brewery.country}</Text>
@@ -282,6 +286,9 @@ export function BeerDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  heroBox: { height: 290, alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  heroGlow: { position: "absolute", width: 250, height: 250, borderRadius: 125, backgroundColor: "#F3E4CB" },
+  heroImage: { backgroundColor: "transparent" },
   content: { padding: spacing.lg, paddingBottom: 120 },
 
   decoCircle: {

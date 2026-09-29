@@ -13,16 +13,16 @@ export type FoundProduct = {
   country: string | null;
 };
 
-const COUNTRIES: Record<string, string> = {
+export const COUNTRIES: Record<string, string> = {
   "en:russia": "Россия", "en:germany": "Германия", "en:belgium": "Бельгия", "en:czech-republic": "Чехия",
   "en:united-kingdom": "Великобритания", "en:ireland": "Ирландия", "en:united-states": "США",
   "en:netherlands": "Нидерланды", "en:poland": "Польша", "en:france": "Франция", "en:denmark": "Дания",
   "en:japan": "Япония", "en:mexico": "Мексика", "en:belarus": "Беларусь", "en:ukraine": "Украина",
 };
 
-const BEER_TAG = /beer|lager|\bale\b|-ale|stout|porter|pilsner|ipa|weiss|wheat-beer|bock|lambic/;
+export const BEER_TAG = /beer|lager|\bale\b|-ale|stout|porter|pilsner|ipa|weiss|wheat-beer|bock|lambic/;
 
-function styleFrom(tags: string[]): string {
+export function styleFrom(tags: string[]): string {
   const has = (re: RegExp) => tags.some((t) => re.test(t));
   if (has(/new-england|neipa/)) return "New England IPA";
   if (has(/ipa/)) return "IPA";

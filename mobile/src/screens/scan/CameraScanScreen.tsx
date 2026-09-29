@@ -7,6 +7,7 @@ import * as ImagePicker from "expo-image-picker";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { Button } from "../../components/Button";
+import { BeerArt } from "../../components/BeerArt";
 import { MatchRing } from "../../components/MatchRing";
 import { scanApi } from "../../api/beervia";
 import { apiErrorMessage } from "../../api/client";
@@ -181,6 +182,13 @@ export function CameraScanScreen() {
               </View>
             </View>
           )
+        )}
+
+        {found && (
+          <View style={styles.foundImageWrap} pointerEvents="none">
+            <View style={styles.foundGlow} />
+            <BeerArt name={found.name} imageUrl={found.imageUrl} size={180} height={260} shape="rounded" style={{ backgroundColor: "transparent" }} />
+          </View>
         )}
 
         {notFound ? (
@@ -393,6 +401,9 @@ const styles = StyleSheet.create({
   suggestOpen: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.primary },
   notFoundTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.text },
   notFoundText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.textMuted },
+
+  foundImageWrap: { position: "absolute", top: 0, left: 0, right: 0, bottom: 200, alignItems: "center", justifyContent: "center" },
+  foundGlow: { position: "absolute", width: 260, height: 260, borderRadius: 130, backgroundColor: "rgba(245,234,216,0.16)" },
 
   foundCard: {
     marginHorizontal: spacing.md,

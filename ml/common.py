@@ -34,7 +34,8 @@ def load_labels(data_dir: pathlib.Path) -> dict[str, dict[str, str]]:
 def list_photos(folder: pathlib.Path) -> list[pathlib.Path]:
     if not folder.is_dir():
         return []
-    return sorted(p for p in folder.iterdir() if p.suffix.lower() in IMAGE_EXTENSIONS)
+    # cutout.png — «студийная» вырезка для показа в приложении, это не эталонное фото для распознавания
+    return sorted(p for p in folder.iterdir() if p.suffix.lower() in IMAGE_EXTENSIONS and not p.name.startswith("cutout"))
 
 
 def open_image(path: pathlib.Path) -> Image.Image | None:

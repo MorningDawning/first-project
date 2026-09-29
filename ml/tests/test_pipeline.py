@@ -222,3 +222,42 @@ def test_name_matching_logic_with_synthetic_vectors():
     tie = unit(names[0] + names[1])  # два пива одинаково подходят
     ok, found = gallery.recognize(tie)
     assert not ok and {f[0]["key"] for f in found} >= {"b0", "b1"}
+
+
+def _can_on(background, size=(300, 400)):
+    image = Image.new("RGB", size, background)
+    d = ImageDraw.Draw(image)
+    d.rounded_rectangle([90, 60, 210, 340], radius=14, fill=(200, 30, 40))  # банка
+    d.rectangle([110, 150, 190, 230], fill=(255, 255, 255))                   # белая этикетка внутри
+    return image
+
+
+def test_cutout_white_background_is_removed_and_cropped():
+    from make_cutouts import cutout_floodfill
+
+    result, note = cutout_floodfill(_can_on((250, 250, 250)))
+    assert note == "ok" and result.mode == "RGBA"
+    # обрезано по банке (с небольшим полем): не весь кадр 300x400
+    assert result.width < 230 and result.height < 350
+    alpha = np.asarray(result.getchannel("A"))
+    assert alpha[0, 0] == 0 and alpha[-1, -1] == 0             # углы прозрачные
+    assert alpha[alpha.shape[0] // 2, alpha.shape[1] // 2] == 255  # середина (белая этикетка) осталась
+
+
+def test_cutout_rejects_busy_background():
+    from make_cutouts import cutout_floodfill
+
+    rng = np.random.default_rng(3)
+    busy = Image.fromarray(rng.integers(0, 255, (400, 300, 3), dtype=np.uint8), "RGB")
+    result, note = cutout_floodfill(busy)
+    assert result is None and "неоднородный" in note
+
+
+def test_make_cutouts_script_and_gallery_ignores_cutout(dataset):
+    _can_on((255, 255, 255)).save(dataset / "red-lager" / "big.jpg")
+    subprocess.run([sys.executable, "make_cutouts.py", "--data", str(dataset), "--mode", "floodfill", "--only", "red-lager"],
+                   cwd=ML_DIR, check=True, capture_output=True, text=True)
+    assert (dataset / "red-lager" / "big.jpg").exists() and (dataset / "red-lager" / "cutout.png").exists()
+    from common import list_photos
+
+    assert "cutout.png" not in [p.name for p in list_photos(dataset / "red-lager")]

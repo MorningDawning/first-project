@@ -1,68 +1,60 @@
 /**
- * Подтягивает реальные фото пива из ml/dataset/ (те же, что собираются для
- * дообучения CLIP) в beer.imageUrl — вместо угаданных внешних ссылок.
+ * Подтягивает фото пива из ml/dataset/ в beer.imageUrl.
  *
- * Для каждой марки с хотя бы одним фото берёт первое (по алфавиту) и
- * записывает относительный путь вида "/beer-photos/<slug>/<файл>" —
- * express уже отдаёт эту папку статикой (см. src/index.ts), а мобильное
- * приложение само достраивает адрес до полного (см. resolveMediaUrl в
- * mobile/src/api/config.ts).
+ * Для каждой марки берётся «студийная» вырезка cutout.png (её делает ml/make_cutouts.py), а если её ещё нет,
+ * первое фото из папки. Записывается путь вида "/beer-photos/<папка>/<файл>": сервер отдаёт ml/dataset статикой
+ * (см. src/index.ts), а приложение само достраивает адрес до полного (см. resolveMediaUrl в mobile/src/api/config.ts).
  *
- * Запуск: npm run sync-photos (можно повторять сколько угодно раз по мере
- * пополнения датасета — ничего не ломает и не перетирает остальные данные).
+ * Запуск: npm run sync-photos:local (можно повторять сколько угодно раз, ничего не ломает).
  */
 import fs from "fs";
 import path from "path";
 import { prisma } from "../lib/prisma";
+import { DATASET_DIR, readLabels } from "../lib/labels";
 
-const DATASET_DIR = path.join(__dirname, "..", "..", "..", "ml", "dataset");
-const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"];
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
 
 async function main() {
-  const labelsPath = path.join(DATASET_DIR, "labels.json");
-  if (!fs.existsSync(labelsPath)) {
-    console.error(`Не найден ${labelsPath}`);
+  const labels = readLabels();
+  if (Object.keys(labels).length === 0) {
+    console.error("Не найден ml/dataset/labels.json (или он пуст). Сначала: npm run export-labels:local");
     process.exit(1);
   }
-  const raw: Record<string, string | { beer: string; brewery?: string }> = JSON.parse(fs.readFileSync(labelsPath, "utf-8"));
-  const labels: Record<string, string> = Object.fromEntries(
-    Object.entries(raw).map(([slug, value]) => [slug, typeof value === "string" ? value : value.beer])
-  );
 
   let updated = 0;
   let skipped = 0;
+  let cutouts = 0;
 
-  for (const [slug, beerName] of Object.entries(labels)) {
+  for (const [slug, label] of Object.entries(labels)) {
     const folder = path.join(DATASET_DIR, slug);
     if (!fs.existsSync(folder)) {
       skipped++;
       continue;
     }
-
-    const photos = fs
+    const files = fs
       .readdirSync(folder)
       .filter((f) => IMAGE_EXTENSIONS.includes(path.extname(f).toLowerCase()))
       .sort();
-
-    if (photos.length === 0) {
-      console.log(`  [пропуск] ${slug}: фото нет`);
+    const file = files.includes("cutout.png") ? "cutout.png" : files.find((f) => !f.startsWith("cutout"));
+    if (!file) {
       skipped++;
       continue;
     }
 
-    const imageUrl = `/beer-photos/${slug}/${photos[0]}`;
-    const result = await prisma.beer.updateMany({ where: { name: beerName }, data: { imageUrl } });
-
+    const imageUrl = `/beer-photos/${slug}/${file}`;
+    const result = await prisma.beer.updateMany({
+      where: { name: label.beer, ...(label.brewery ? { brewery: { name: label.brewery } } : {}) },
+      data: { imageUrl },
+    });
     if (result.count === 0) {
-      console.log(`  [предупреждение] ${slug}: пиво "${beerName}" не найдено в базе`);
+      console.log(`  [предупреждение] ${slug}: пива «${label.beer}» нет в базе`);
       continue;
     }
-
-    console.log(`  ${slug} (${beerName}) -> ${imageUrl} (всего фото: ${photos.length})`);
+    if (file === "cutout.png") cutouts++;
     updated++;
   }
 
-  console.log(`\nГотово: обновлено ${updated}, пропущено (нет фото) ${skipped}.`);
+  console.log(`Готово: обновлено ${updated} (из них с вырезкой ${cutouts}), пропущено (нет фото) ${skipped}.`);
 }
 
 main()

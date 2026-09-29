@@ -30,22 +30,29 @@ type Props = {
   name: string;
   imageUrl?: string | null;
   size: number;
+  /** Высота, если картинка вытянута (банка/бутылка, «студийная» вырезка). По умолчанию квадрат. */
+  height?: number;
   shape?: "circle" | "rounded" | "square";
   style?: StyleProp<ViewStyle>;
 };
 
-export function BeerArt({ name, imageUrl, size, shape = "rounded", style }: Props) {
+export function BeerArt({ name, imageUrl, size, height, shape = "rounded", style }: Props) {
   const [failed, setFailed] = useState(false);
   const resolvedUrl = resolveMediaUrl(imageUrl);
+  const boxHeight = height ?? size;
 
   const borderRadius = shape === "circle" ? size / 2 : shape === "rounded" ? size * 0.22 : 0;
-  const containerStyle: ViewStyle = { width: size, height: size, borderRadius, overflow: "hidden" };
+  const containerStyle: ViewStyle = { width: size, height: boxHeight, borderRadius, overflow: "hidden" };
 
   if (resolvedUrl && !failed) {
+    // Фото упаковки не обрезаем под квадрат: банку или бутылку показываем целиком.
+    // Вырезка (cutout.png) прозрачная, обычное фото упаковки почти всегда на белом фоне.
+    const cutout = /cutout\.png$/i.test(resolvedUrl);
     return (
       <Image
         source={{ uri: resolvedUrl }}
-        style={[containerStyle, style] as unknown as StyleProp<ImageStyle>}
+        resizeMode="contain"
+        style={[containerStyle, cutout ? null : { backgroundColor: "#fff" }, style] as unknown as StyleProp<ImageStyle>}
         onError={() => setFailed(true)}
       />
     );
@@ -54,7 +61,7 @@ export function BeerArt({ name, imageUrl, size, shape = "rounded", style }: Prop
   const { bg, fg } = paletteFor(name);
   return (
     <View style={[containerStyle, styles.placeholder, { backgroundColor: bg }, style]}>
-      <Text style={{ fontSize: size * 0.42, color: fg }}>🍺</Text>
+      <Text style={{ fontSize: Math.min(size, boxHeight) * 0.42, color: fg }}>🍺</Text>
     </View>
   );
 }
