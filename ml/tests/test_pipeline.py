@@ -261,3 +261,20 @@ def test_make_cutouts_script_and_gallery_ignores_cutout(dataset):
     from common import list_photos
 
     assert "cutout.png" not in [p.name for p in list_photos(dataset / "red-lager")]
+
+
+def test_grabcut_cuts_object_on_busy_background():
+    pytest.importorskip("cv2")
+    from make_cutouts import cutout_grabcut
+
+    rng = np.random.default_rng(5)
+    noise = rng.integers(60, 200, (700, 500, 3), dtype=np.uint8)
+    image = Image.fromarray(noise, "RGB").resize((100, 140)).resize((500, 700), Image.BICUBIC)  # пёстрый фон
+    d = ImageDraw.Draw(image)
+    d.rounded_rectangle([170, 260, 330, 660], radius=30, fill=(30, 90, 40))
+    d.rectangle([220, 70, 280, 270], fill=(30, 90, 40))
+    result, note = cutout_grabcut(image)
+    assert note == "ok" and result.mode == "RGBA"
+    alpha = np.asarray(result.getchannel("A"))
+    assert alpha[alpha.shape[0] // 2, alpha.shape[1] // 2] == 255
+    assert alpha[0, 0] == 0

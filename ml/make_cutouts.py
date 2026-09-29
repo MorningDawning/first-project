@@ -8,12 +8,14 @@
 Потом в server: npm run sync-photos:local, и приложение начнёт показывать вырезки.
 
 Режимы (--mode):
-  floodfill  (по умолчанию, если нет rembg) фон вырезается, если он однородный: белый или светлый,
-             как на большинстве снимков упаковки в Open Food Facts. Фото на «живом» фоне пропускаются и в отчёте
-             помечены; для них приложение покажет исходную картинку.
-  rembg      нейросеть вырезает любой фон. Установка: pip install "rembg[cpu]", при первом запуске скачивается
-             модель (около 170 МБ, может понадобиться VPN).
-  auto       rembg, если он установлен, иначе floodfill.
+  floodfill  фон вырезается, если он однородный (белый или светлый, как на студийных снимках). Быстро и чисто,
+             но на «живом» фоне не работает.
+  grabcut    алгоритм OpenCV: выделяет предмет в центре кадра на любом фоне, без скачивания моделей.
+             Края немного грубее, чем у нейросети, а бутылки на пёстром фоне могут выйти неидеально.
+  rembg      нейросеть вырезает любой фон и убирает тень. Установка: pip install "rembg[cpu]", при первом
+             запуске скачивается модель (около 170 МБ, может понадобиться VPN). На самых новых версиях
+             Python может не ставиться.
+  auto       (по умолчанию) rembg, если он установлен; иначе сначала floodfill, а если фон не подошёл, то grabcut.
 """
 
 from __future__ import annotations
@@ -106,6 +108,63 @@ def cutout_rembg(image: Image.Image) -> tuple[Image.Image | None, str]:
     return (_crop_with_padding(result, box), "ok") if box else (None, "ничего не осталось")
 
 
+def cutout_grabcut(image: Image.Image) -> tuple[Image.Image | None, str]:
+    """Вырезка алгоритмом GrabCut (OpenCV): предмет в центре кадра, любой фон, без нейросети."""
+    try:
+        import cv2
+    except ImportError:
+        return None, "не установлен opencv (pip install opencv-python-headless)"
+
+    image = image.convert("RGB")
+    scale = min(1.0, 560 / max(image.size))
+    if scale < 1:
+        image = image.resize((max(1, round(image.width * scale)), max(1, round(image.height * scale))), Image.LANCZOS)
+    height, width = image.height, image.width
+    bgr = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+
+    # Начальная разметка: рамка кадра — точно фон, центр — вероятно предмет, остальное — вероятно фон.
+    mask = np.full((height, width), cv2.GC_PR_BGD, dtype=np.uint8)
+    mx, my = max(2, round(width * 0.04)), max(2, round(height * 0.03))
+    mask[:my, :] = mask[-my:, :] = cv2.GC_BGD
+    mask[:, :mx] = mask[:, -mx:] = cv2.GC_BGD
+    # Границы подобраны по проверке на пёстрых фонах: узкая область «вероятно предмет» даёт заметно чище края.
+    mask[round(height * 0.12) : round(height * 0.9), round(width * 0.33) : round(width * 0.67)] = cv2.GC_PR_FGD
+    mask[round(height * 0.3) : round(height * 0.7), round(width * 0.42) : round(width * 0.58)] = cv2.GC_FGD
+    try:
+        cv2.grabCut(bgr, mask, None, np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64), 6, cv2.GC_INIT_WITH_MASK)
+    except cv2.error as exc:
+        return None, f"GrabCut не справился ({exc.err})"
+
+    foreground = ((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD)).astype(np.uint8)
+    # Оставляем самую крупную связную область (остальные пятна — обрывки фона) и закрываем дырки внутри.
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(foreground, connectivity=8)
+    if count <= 1:
+        return None, "ничего не осталось"
+    biggest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+    foreground = (labels == biggest).astype(np.uint8)
+    contours, _ = cv2.findContours(foreground, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    filled = np.zeros_like(foreground)
+    cv2.drawContours(filled, contours, -1, 1, thickness=cv2.FILLED)
+
+    fill = filled.mean()
+    if not (MIN_FILL <= fill <= MAX_FILL):
+        return None, f"предмет занимает {fill:.0%} кадра — вырезка ненадёжна"
+
+    alpha = Image.fromarray(filled * 255, "L").filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(1.0))
+    box = alpha.getbbox()
+    if box is None:
+        return None, "ничего не осталось"
+    result = image.convert("RGBA")
+    result.putalpha(alpha)
+    return _crop_with_padding(result, box), "ok"
+
+
+def cutout_auto(image: Image.Image) -> tuple[Image.Image | None, str]:
+    """Сначала быстрый и чистый способ по однородному фону, если не подошёл — GrabCut."""
+    result, note = cutout_floodfill(image)
+    return (result, note) if result is not None else cutout_grabcut(image)
+
+
 def _crop_with_padding(image: Image.Image, box: tuple[int, int, int, int]) -> Image.Image:
     left, top, right, bottom = box
     pad_x, pad_y = round((right - left) * PADDING), round((bottom - top) * PADDING)
@@ -126,7 +185,7 @@ def pick_source(folder: pathlib.Path) -> tuple[pathlib.Path, Image.Image] | None
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data", default="dataset")
-    parser.add_argument("--mode", default="auto", choices=["auto", "floodfill", "rembg"])
+    parser.add_argument("--mode", default="auto", choices=["auto", "floodfill", "grabcut", "rembg"])
     parser.add_argument("--only", help="Только эта папка")
     parser.add_argument("--force", action="store_true", help="Переделать, даже если cutout.png уже есть")
     args = parser.parse_args()
@@ -138,8 +197,8 @@ def main() -> None:
 
             mode = "rembg"
         except ImportError:
-            mode = "floodfill"
-    make = cutout_rembg if mode == "rembg" else cutout_floodfill
+            pass
+    make = {"rembg": cutout_rembg, "floodfill": cutout_floodfill, "grabcut": cutout_grabcut}.get(mode, cutout_auto)
     print(f"Режим: {mode}")
 
     data_dir = pathlib.Path(args.data)

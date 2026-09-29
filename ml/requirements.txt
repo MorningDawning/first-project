@@ -5,3 +5,4 @@ open_clip_torch>=2.26
 torch>=2.4
 numpy>=1.26
 Pillow>=10.4
+opencv-python-headless>=4.9
