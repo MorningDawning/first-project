@@ -1,0 +1,17 @@
+# Локальный Postgres для разработки на своём компьютере (нужен Docker):
+#   docker compose up -d
+# и в server/.env:
+#   DATABASE_URL="postgresql://beervia:beervia@localhost:5432/beervia"
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: beervia
+      POSTGRES_PASSWORD: beervia
+      POSTGRES_DB: beervia
+    ports:
+      - "5432:5432"
+    volumes:
+      - beervia-db:/var/lib/postgresql/data
+volumes:
+  beervia-db:

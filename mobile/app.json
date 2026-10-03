@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "BeerVia",
+    "slug": "beervia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FBF3E7",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "BeerVia использует камеру, чтобы сканировать этикетки и банки пива.",
+        "NSPhotoLibraryUsageDescription": "BeerVia использует галерею, чтобы распознать пиво по выбранному фото."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#D85A30",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "BeerVia использует камеру, чтобы сканировать этикетки и банки пива."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BeerVia использует галерею, чтобы распознать пиво по выбранному фото."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "BeerVia использует микрофон для записи голосовых сообщений.",
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#FBF3E7",
+          "resizeMode": "contain"
+        }
+      ]
+    ]
+  }
+}

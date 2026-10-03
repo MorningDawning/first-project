@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  bio          String?
+  username     String?   @unique // @handle, генерируется при регистрации, можно сменить в настройках
+  city         String?
+  lastSeenAt   DateTime? // «в сети» = активность за последние пару минут
+  birthDate       DateTime? // дата рождения: приложение только для совершеннолетних (18+); null у старых аккаунтов до подтверждения
+  termsAcceptedAt DateTime? // когда принята политика конфиденциальности
+  createdAt    DateTime  @default(now())
+
+  // Вкусовые предпочтения из онбординг-квиза (0-100), заполняются до первого
+  // скана или отзыва — см. computeUserTasteProfile в lib/taste.ts.
+  prefSweetness  Int?
+  prefBitterness Int?
+  prefSourness   Int?
+  prefBody       Int?
+  prefAroma      Int?
+
+  reviews      Review[]
+  scans        ScanHistory[]
+  posts        Post[]
+  postLikes    PostLike[]
+  comments     Comment[]
+  commentLikes CommentLike[]
+  wishlist     Wishlist[]
+  friendsFrom  Friendship[]         @relation("FriendshipFrom")
+  friendsTo    Friendship[]         @relation("FriendshipTo")
+  messages     Message[]
+  memberships  ConversationMember[]
+  reports      Report[]
+}
+
+model Brewery {
+  id          String  @id @default(cuid())
+  name        String
+  country     String
+  city        String?
+  description String?
+  logoUrl     String?
+
+  beers Beer[]
+}
+
+model Beer {
+  id          String  @id @default(cuid())
+  name        String
+  breweryId   String
+  style       String
+  abv         Float
+  ibu         Int?
+  description String
+  imageUrl    String?
+  barcode     String? @unique
+
+  // taste profile axes, 0-100
+  sweetness  Int
+  bitterness Int
+  sourness   Int
+  body       Int
+  aroma      Int
+
+  // Вкус складывается из оценки по стилю (tasteBase) и голосов пользователей (теги в отзывах): см. lib/crowdTaste.ts
+  tasteBase  String? // JSON: исходная оценка по стилю; пока null, оси выше и есть оценка по стилю
+  tasteVotes Int     @default(0) // сколько человек отметили вкус тегами
+
+  foodPairings String // JSON-encoded string array
+
+  brewery  Brewery       @relation(fields: [breweryId], references: [id])
+  reviews  Review[]
+  scans    ScanHistory[]
+  wishlist Wishlist[]
+  posts    Post[]
+  messages Message[]
+  comments Comment[]
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  beerId    String
+  userId    String
+  rating    Int // 1-5
+  text      String?
+  tags      String   @default("[]") // JSON-encoded string array — flavor notes tapped on the rating sheet
+  createdAt DateTime @default(now())
+
+  beer Beer @relation(fields: [beerId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([beerId, userId])
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  beerId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  beer Beer @relation(fields: [beerId], references: [id])
+
+  @@unique([userId, beerId])
+}
+
+model ScanHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  beerId    String
+  scannedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  beer Beer @relation(fields: [beerId], references: [id])
+}
+
+model Post {
+  id         String   @id @default(cuid())
+  userId     String
+  text       String
+  beerId     String?
+  rating     Int? // оценка пива из поста (1-5), при публикации превращается в отзыв
+  place      String?
+  visibility String   @default("friends") // "friends" | "all"
+  photos     String   @default("[]") // JSON-массив ссылок на загруженные фото
+  createdAt  DateTime @default(now())
+
+  user     User       @relation(fields: [userId], references: [id])
+  beer     Beer?      @relation(fields: [beerId], references: [id])
+  likes    PostLike[]
+  comments Comment[]
+
+  @@index([createdAt])
+  @@map("FriendPost")
+}
+
+model PostLike {
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@id([postId, userId])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  postId      String
+  userId      String
+  parentId    String? // один уровень вложенности: ответ всегда привязан к корневому комментарию
+  text        String // пустая строка, если в комментарии только фото или пиво
+  photoUrl    String?
+  photoWidth  Int?
+  photoHeight Int?
+  beerId      String? // приложенная карточка пива
+  createdAt   DateTime @default(now())
+
+  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id])
+  beer    Beer?         @relation(fields: [beerId], references: [id])
+  parent  Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[]     @relation("CommentReplies")
+  likes   CommentLike[]
+
+  @@index([postId, createdAt])
+}
+
+model CommentLike {
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@id([commentId, userId])
+}
+
+model Conversation {
+  id            String   @id @default(cuid())
+  type          String // "direct" | "group"
+  title         String? // только у групп
+  createdById   String?
+  createdAt     DateTime @default(now())
+  lastMessageAt DateTime @default(now())
+  directKey     String?  @unique // "<меньший id>:<больший id>" — на пару людей один личный чат
+
+  members  ConversationMember[]
+  messages Message[]
+}
+
+model ConversationMember {
+  conversationId String
+  userId         String
+  role           String    @default("member") // "owner" | "member"
+  joinedAt       DateTime  @default(now())
+  lastReadAt     DateTime? // всё, что старше, прочитано этим участником
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  conversationId  String
+  senderId        String
+  kind            String    @default("user") // "user" | "system"
+  text            String?
+  beerId          String? // сообщение-карточка с пивом
+  photoUrl        String?
+  photoWidth      Int?
+  photoHeight     Int?
+  audioUrl        String? // голосовое сообщение
+  audioDurationMs Int?
+  replyToId       String? // ответ на другое сообщение
+  editedAt        DateTime?
+  deletedAt       DateTime? // удалено у всех: содержимое стирается, строка остаётся для цитат
+  createdAt       DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+  beer         Beer?        @relation(fields: [beerId], references: [id])
+  replyTo      Message?     @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      Message[]    @relation("MessageReplies")
+
+  @@index([conversationId, createdAt])
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  targetType String // "user" | "post" | "comment" | "message"
+  targetId   String
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id])
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  userId    String
+  friendId  String
+  status    String // "pending" | "accepted"
+  createdAt DateTime @default(now())
+
+  user   User @relation("FriendshipFrom", fields: [userId], references: [id])
+  friend User @relation("FriendshipTo", fields: [friendId], references: [id])
+
+  @@unique([userId, friendId])
+  @@index([friendId, status])
+}
