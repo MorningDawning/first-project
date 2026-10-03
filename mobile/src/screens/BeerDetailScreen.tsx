@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MainTabParamList } from "../navigation/types";
 import { LoadingView, ErrorView } from "../components/StateViews";
 import { BeerArt } from "../components/BeerArt";
+import { BeerBubbles } from "../components/BeerBubbles";
 import { RatingSheet } from "../components/RatingSheet";
 import { ICON_PATHS, PathIcon } from "../components/PathIcon";
 import { beersApi, barApi, tasteProfileApi, wishlistApi } from "../api/beervia";
@@ -99,6 +100,7 @@ export function BeerDetailScreen() {
   const [barAdded, setBarAdded] = useState(false);
   const [lens, setLens] = useState<Lens>("similar");
   const [allReviews, setAllReviews] = useState(false);
+  const [head, setHead] = useState({ w: 0, h: 0 }); // размер шапки: по нему рассчитывается подъём пузырьков
 
   const [ratingOpen, setRatingOpen] = useState(false);
   const [savingReview, setSavingReview] = useState(false);
@@ -199,16 +201,14 @@ export function BeerDetailScreen() {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Шапка в цвет пива, сверху пена */}
-        <View style={[styles.head, { backgroundColor: color }]}>
+        <View style={[styles.head, { backgroundColor: color }]} onLayout={(e) => setHead({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
           <View style={[styles.foam, { height: foamTop }]} />
           <View style={[styles.foamBubbles, { top: foamTop - 20 }]}>
             {[44, 58, 40, 64, 48, 56, 42, 60, 46].map((s, i) => (
               <View key={i} style={{ width: s, height: s, borderRadius: s, backgroundColor: C.card, marginTop: i % 2 ? -12 : -4 }} />
             ))}
           </View>
-          {[[30, 190, 8], [62, 260, 5], [300, 150, 10], [340, 230, 6], [180, 170, 6], [230, 300, 4], [20, 330, 6], [140, 250, 4]].map(([x, y, s], i) => (
-            <View key={i} style={{ position: "absolute", left: x, top: y + foamTop - 100, width: s, height: s, borderRadius: s, backgroundColor: tint(color, 0.35) }} />
-          ))}
+          <BeerBubbles color={tint(color, 0.4)} width={head.w} height={head.h} foamHeight={foamTop} />
 
           <View style={[styles.topRow, { marginTop: Math.max(insets.top, 12) + 4 }]}>
             <Pressable onPress={() => navigation.goBack()} style={styles.roundBtn} hitSlop={8}>
