@@ -70,6 +70,10 @@ model Beer {
   body       Int
   aroma      Int
 
+  // Вкус складывается из оценки по стилю (tasteBase) и голосов пользователей (теги в отзывах): см. lib/crowdTaste.ts
+  tasteBase  String? // JSON: исходная оценка по стилю; пока null, оси выше и есть оценка по стилю
+  tasteVotes Int     @default(0) // сколько человек отметили вкус тегами
+
   foodPairings String // JSON-encoded string array
 
   brewery  Brewery       @relation(fields: [breweryId], references: [id])

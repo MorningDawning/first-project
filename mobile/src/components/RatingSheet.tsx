@@ -6,7 +6,16 @@ import { Button } from "./Button";
 import { useKeyboardAvoidance } from "../lib/useKeyboardAvoidance";
 import { colors, fonts, radius, spacing } from "../theme/colors";
 
-export const FLAVOR_TAGS = ["Сочный", "Цитрус", "Мягкая горечь", "Плотное", "Тропики", "Водянистое", "Слишком сладкое"];
+// Теги уточняют вкус сорта для всех (см. server/src/lib/crowdTaste.ts). Противоположные не выбираются вместе.
+export const FLAVOR_TAGS = [
+  "Сладкое", "Сухое", "Горькое", "Мягкая горечь", "Кислое", "Без кислинки",
+  "Плотное", "Водянистое", "Ароматное", "Слабый аромат", "Цитрус", "Тропики",
+];
+const OPPOSITE: Record<string, string> = {
+  "Сладкое": "Сухое", "Сухое": "Сладкое", "Горькое": "Мягкая горечь", "Мягкая горечь": "Горькое",
+  "Кислое": "Без кислинки", "Без кислинки": "Кислое", "Плотное": "Водянистое", "Водянистое": "Плотное",
+  "Ароматное": "Слабый аромат", "Слабый аромат": "Ароматное",
+};
 
 type Props = {
   visible: boolean;
@@ -45,7 +54,9 @@ export function RatingSheet({
   }, [visible, initialRating, initialText, initialTags]);
 
   function toggleTag(tag: string) {
-    setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+    setTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev.filter((t) => t !== OPPOSITE[tag]), tag]
+    );
   }
 
   return (
@@ -59,14 +70,14 @@ export function RatingSheet({
           <BeerArt name={beerName} imageUrl={imageUrl} size={52} shape="rounded" />
           <View style={styles.headerText}>
             <Text style={styles.headerTitle}>Как тебе {beerName}?</Text>
-            <Text style={styles.headerSubtitle}>Оценка уточнит твой профиль</Text>
+            <Text style={styles.headerSubtitle}>Оценка уточнит твой профиль, а отметки вкуса — карточку пива</Text>
           </View>
         </View>
 
         <StarRating rating={rating} onChange={setRating} size={40} />
 
         <View style={styles.tagsBlock}>
-          <Text style={styles.tagsLabel}>Что почувствовал</Text>
+          <Text style={styles.tagsLabel}>Какой вкус?</Text>
           <View style={styles.tags}>
             {FLAVOR_TAGS.map((tag) => {
               const selected = tags.includes(tag);

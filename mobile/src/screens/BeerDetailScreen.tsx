@@ -206,6 +206,12 @@ export function BeerDetailScreen() {
           </View>
         )}
 
+        <Text style={styles.tasteSource}>
+          {beer.tasteSource === "users"
+            ? `Вкус по оценкам пользователей (отметили: ${beer.tasteVotes})`
+            : "Вкус — примерная оценка по стилю. Оцените пиво и отметьте вкус, чтобы уточнить."}
+        </Text>
+
         <Text style={styles.description}>{beer.description}</Text>
 
         <Text style={styles.sectionTitle}>Сочетается с</Text>
@@ -356,6 +362,7 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
   legendDotYou: { width: 10, height: 10, borderRadius: 5, borderWidth: 2.5, borderColor: colors.text },
   legendDotBeer: { width: 14, height: 8, borderRadius: 9, backgroundColor: colors.primary },
+  tasteSource: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
   legendLabel: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
   compareRow: { gap: 6 },
   compareLabel: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.text },

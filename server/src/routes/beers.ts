@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
+import { recalcBeerTaste } from "../lib/crowdTaste";
 import { computeUserTasteProfile, findSimilarBeers, matchPercent, tasteVector } from "../lib/taste";
 import { serializeBeer, serializeBeerDetail } from "../lib/serialize";
 import { fold } from "../lib/text";
@@ -107,6 +108,8 @@ beersRouter.post("/:id/reviews", requireAuth, async (req, res) => {
     update: data,
     create: { ...data, beerId: beer.id, userId: req.userId! },
   });
+
+  await recalcBeerTaste(beer.id);
 
   res.status(201).json({ ...review, tags: JSON.parse(review.tags) });
 });

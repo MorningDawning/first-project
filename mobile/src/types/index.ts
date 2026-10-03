@@ -26,6 +26,8 @@ export type BeerSummary = {
   imageUrl: string | null;
   brewery: { id: string; name: string; country: string; logoUrl?: string | null };
   tasteProfile: TasteProfile;
+  tasteVotes: number;
+  tasteSource: "style" | "users"; // откуда вкус: оценка по стилю или голоса пользователей
   foodPairings: string[];
   matchPercent: number | null;
   isWishlisted: boolean;

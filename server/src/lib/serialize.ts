@@ -1,4 +1,5 @@
 import { Beer, Brewery, Review, User } from "@prisma/client";
+import { USERS_MIN_VOTES } from "./crowdTaste";
 import { tasteVector } from "./taste";
 
 type BeerWithBrewery = Beer & { brewery: Brewery };
@@ -20,6 +21,8 @@ export function serializeBeer(beer: BeerWithBrewery, matchPercent: number | null
       logoUrl: beer.brewery.logoUrl,
     },
     tasteProfile: tasteVector(beer),
+    tasteVotes: beer.tasteVotes,
+    tasteSource: beer.tasteVotes >= USERS_MIN_VOTES ? "users" : "style",
     foodPairings: JSON.parse(beer.foodPairings) as string[],
     matchPercent,
     isWishlisted,
