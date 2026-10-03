@@ -19,6 +19,8 @@ import { profilesRouter } from "./routes/profiles";
 import { chatsRouter } from "./routes/chats";
 import { attachRealtime } from "./lib/realtime";
 import { UPLOADS_DIR, uploadsRouter } from "./routes/uploads";
+import { legalRouter } from "./routes/legal";
+import { legalConfigured } from "./lib/legal";
 
 // Express 4 doesn't forward a rejected promise from an async route handler
 // to error middleware on its own, and Node kills the whole process on an
@@ -71,6 +73,7 @@ app.use("/beer-photos", express.static(path.join(__dirname, "..", "..", "ml", "d
 // Фото из постов. nosniff — чтобы браузер не пытался «угадать» иной тип файла.
 app.use("/uploads", express.static(UPLOADS_DIR, { setHeaders: (res) => res.setHeader("X-Content-Type-Options", "nosniff") }));
 
+app.use("/", legalRouter);
 app.use("/auth", authRouter);
 app.use("/", usersRouter);
 app.use("/beers", beersRouter);
@@ -91,6 +94,10 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   console.error(err);
   res.status(500).json({ error: "Внутренняя ошибка сервера" });
 });
+
+if (process.env.NODE_ENV === "production" && !legalConfigured()) {
+  console.warn("[!] Не заданы LEGAL_OPERATOR и LEGAL_CONTACT_EMAIL: в политике конфиденциальности останутся заглушки в скобках.");
+}
 
 const port = Number(process.env.PORT) || 4000;
 const server = app.listen(port, () => {

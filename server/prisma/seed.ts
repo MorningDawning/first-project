@@ -45,6 +45,7 @@ async function main() {
       passwordHash,
       name: "Демо Пользователь",
       username: "demo",
+      birthDate: new Date("1990-01-01"),
       city: "Москва",
       bio: "Люблю хмелевые сорта и всё, что с ароматом тропических фруктов.",
     },

@@ -47,7 +47,7 @@ export async function seedCommunity(prisma: PrismaClient, viewers: User[]) {
     users[key] = await prisma.user.upsert({
       where: { email: data.email },
       update: {},
-      create: { ...data, passwordHash },
+      create: { ...data, passwordHash, birthDate: new Date("1990-01-01") },
     });
   }
   const ids = Object.values(users).map((u) => u.id);

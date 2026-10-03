@@ -28,8 +28,8 @@ export type AuthResponse = {
 };
 
 export const authApi = {
-  register: (email: string, password: string, name: string) =>
-    api.post<AuthResponse>("/auth/register", { email, password, name }).then((r) => r.data),
+  register: (email: string, password: string, name: string, birthDate: string) =>
+    api.post<AuthResponse>("/auth/register", { email, password, name, birthDate, acceptTerms: true }).then((r) => r.data),
   login: (email: string, password: string) =>
     api.post<AuthResponse>("/auth/login", { email, password }).then((r) => r.data),
 };
@@ -38,6 +38,15 @@ export const userApi = {
   me: () => api.get<UserProfile>("/me").then((r) => r.data),
   updateMe: (data: { name?: string; bio?: string; avatarUrl?: string; username?: string; city?: string }) =>
     api.patch<UserProfile>("/me", data).then((r) => r.data),
+  confirmAge: (birthDate: string) => api.post("/me/age", { birthDate, acceptTerms: true }).then((r) => r.data),
+  deleteAccount: (password: string) => api.delete("/me", { data: { password } }).then((r) => r.data),
+};
+
+export const legalApi = {
+  privacy: () =>
+    api
+      .get<{ title: string; updatedAt: string; sections: { heading: string; body: string }[] }>("/legal/privacy")
+      .then((r) => r.data),
 };
 
 export const beersApi = {

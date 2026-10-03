@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { PrivacyPolicyModal } from "../../components/PrivacyPolicyModal";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { Button } from "../../components/Button";
@@ -19,6 +20,11 @@ export function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false); // показан ли блок подтверждения удаления
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleSave() {
     setError(null);
@@ -46,6 +52,32 @@ export function SettingsScreen() {
     }
   }
 
+  function confirmDelete() {
+    setDeleteError(null);
+    if (!deletePassword) return setDeleteError("Введите пароль для подтверждения");
+    Alert.alert(
+      "Удалить аккаунт навсегда?",
+      "Профиль, отзывы, посты, сообщения и загруженные файлы будут удалены без возможности восстановления.",
+      [
+        { text: "Отмена", style: "cancel" },
+        {
+          text: "Удалить",
+          style: "destructive",
+          onPress: async () => {
+            setDeleteBusy(true);
+            try {
+              await userApi.deleteAccount(deletePassword);
+              await logout();
+            } catch (e) {
+              setDeleteError(apiErrorMessage(e, "Не удалось удалить аккаунт"));
+              setDeleteBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  }
+
   return (
     <Screen>
       <Animated.View ref={kb.ref} collapsable={false} style={[{ flex: 1 }, kb.style]}>
@@ -68,6 +100,30 @@ export function SettingsScreen() {
           <Text style={styles.email}>{user?.email}</Text>
           <Button title="Выйти из аккаунта" variant="outline" onPress={logout} />
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Конфиденциальность</Text>
+          <Pressable onPress={() => setPolicyOpen(true)} style={styles.linkRow}>
+            <Text style={styles.link}>Политика конфиденциальности</Text>
+          </Pressable>
+          {!deleting ? (
+            <Pressable onPress={() => setDeleting(true)} style={styles.linkRow}>
+              <Text style={styles.danger}>Удалить аккаунт</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.deleteBox}>
+              <Text style={styles.deleteText}>
+                Аккаунт и все ваши данные будут удалены навсегда: профиль, отзывы, посты, комментарии, сообщения и загруженные файлы.
+                Личные переписки исчезнут и у собеседников. Отменить это нельзя.
+              </Text>
+              <TextField label="Пароль" value={deletePassword} onChangeText={setDeletePassword} secureTextEntry placeholder="Введите пароль" />
+              {deleteError && <Text style={styles.error}>{deleteError}</Text>}
+              <Button title="Удалить аккаунт навсегда" onPress={confirmDelete} loading={deleteBusy} style={{ backgroundColor: colors.danger }} />
+              <Button title="Отмена" variant="outline" onPress={() => { setDeleting(false); setDeletePassword(""); setDeleteError(null); }} style={{ marginTop: spacing.sm }} />
+            </View>
+          )}
+        </View>
+        <PrivacyPolicyModal visible={policyOpen} onClose={() => setPolicyOpen(false)} />
       </ScrollView>
       </Animated.View>
     </Screen>
@@ -81,5 +137,10 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.heading, marginBottom: spacing.xs },
   error: { color: colors.danger },
   saved: { color: colors.success, fontWeight: "700" },
+  linkRow: { paddingVertical: spacing.sm },
+  link: { color: colors.primary, fontWeight: "700", fontSize: 15 },
+  danger: { color: colors.danger, fontWeight: "700", fontSize: 15 },
+  deleteBox: { gap: spacing.xs, borderWidth: 1, borderColor: colors.danger, borderRadius: 14, padding: spacing.md },
+  deleteText: { ...typography.body, marginBottom: spacing.sm },
   email: { ...typography.body, color: colors.textMuted, marginBottom: spacing.sm },
 });

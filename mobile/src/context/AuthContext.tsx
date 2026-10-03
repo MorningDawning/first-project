@@ -8,7 +8,7 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   user: UserProfile | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string, birthDate: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
@@ -44,8 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await refreshUser();
   }, [refreshUser]);
 
-  const register = useCallback(async (email: string, password: string, name: string) => {
-    const { token } = await authApi.register(email, password, name);
+  const register = useCallback(async (email: string, password: string, name: string, birthDate: string) => {
+    const { token } = await authApi.register(email, password, name, birthDate);
     await persistToken(token);
     await refreshUser();
   }, [refreshUser]);

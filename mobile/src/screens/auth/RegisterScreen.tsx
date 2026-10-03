@@ -4,6 +4,8 @@ import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { Button } from "../../components/Button";
+import { AgeConsent } from "../../components/AgeConsent";
+import { checkAgeConsent } from "../../lib/birthDate";
 import { useAuth } from "../../context/AuthContext";
 import { apiErrorMessage } from "../../api/client";
 import { useKeyboardAvoidance } from "../../lib/useKeyboardAvoidance";
@@ -18,14 +20,18 @@ export function RegisterScreen({ navigation }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleRegister() {
     setError(null);
+    const checked = checkAgeConsent(birthDate, accepted);
+    if ("error" in checked) return setError(checked.error);
     setLoading(true);
     try {
-      await register(email.trim(), password, name.trim());
+      await register(email.trim(), password, name.trim(), checked.iso);
     } catch (e) {
       setError(apiErrorMessage(e, "Не удалось зарегистрироваться"));
     } finally {
@@ -56,6 +62,7 @@ export function RegisterScreen({ navigation }: Props) {
             secureTextEntry
             placeholder="минимум 6 символов"
           />
+          <AgeConsent birthDate={birthDate} onBirthDateChange={setBirthDate} accepted={accepted} onAcceptedChange={setAccepted} />
           {error && <Text style={styles.error}>{error}</Text>}
           <Button title="Зарегистрироваться" onPress={handleRegister} loading={loading} style={{ marginTop: spacing.sm }} />
           <Button title="Уже есть аккаунт" variant="outline" onPress={() => navigation.goBack()} style={{ marginTop: spacing.sm }} />

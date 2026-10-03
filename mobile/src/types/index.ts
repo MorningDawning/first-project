@@ -232,6 +232,7 @@ export type UserProfile = {
   bio: string | null;
   username: string | null;
   city: string | null;
+  ageConfirmed: boolean; // false у старых аккаунтов до подтверждения 18+
   createdAt: string;
   stats: { scanCount: number; reviewCount: number };
 };

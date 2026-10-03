@@ -29,6 +29,8 @@ services:
       DATABASE_URL: postgresql://beervia:${POSTGRES_PASSWORD}@db:5432/beervia
       JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET в файле .env}
       UPLOADS_DIR: /data/uploads
+      LEGAL_OPERATOR: ${LEGAL_OPERATOR:-}
+      LEGAL_CONTACT_EMAIL: ${LEGAL_CONTACT_EMAIL:-}
     volumes:
       - uploads:/data/uploads
 

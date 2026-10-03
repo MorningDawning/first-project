@@ -64,6 +64,7 @@ export function LoginScreen({ navigation }: Props) {
             style={{ marginTop: spacing.sm }}
           />
         </View>
+        <Text style={styles.age}>Приложение только для совершеннолетних · 18+</Text>
       </ScrollView>
       </Animated.View>
     </Screen>
@@ -76,5 +77,6 @@ const styles = StyleSheet.create({
   subtitle: { ...typography.caption, textAlign: "center", marginBottom: spacing.xl },
   form: { marginTop: spacing.md },
   error: { color: colors.danger, marginBottom: spacing.sm, textAlign: "center" },
+  age: { ...typography.caption, textAlign: "center", marginTop: spacing.lg },
   hint: { ...typography.caption, textAlign: "center", marginTop: spacing.md },
 });

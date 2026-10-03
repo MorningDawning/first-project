@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { comparePassword, hashPassword, signToken } from "../lib/auth";
 import { usernameFromEmail } from "../lib/social";
+import { UNDERAGE_MESSAGE, isAdult, parseBirthDate } from "../lib/age";
 
 export const authRouter = Router();
 
@@ -10,14 +11,19 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(1),
+  birthDate: z.string(), // ГГГГ-ММ-ДД
+  acceptTerms: z.literal(true), // согласие с политикой конфиденциальности
 });
 
 authRouter.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "Проверьте email, имя и пароль (мин. 6 символов)" });
+    return res.status(400).json({ error: "Проверьте email, имя, пароль (мин. 6 символов), дату рождения и согласие с политикой" });
   }
   const { email, password, name } = parsed.data;
+  const birthDate = parseBirthDate(parsed.data.birthDate);
+  if (!birthDate) return res.status(400).json({ error: "Проверьте дату рождения" });
+  if (!isAdult(birthDate)) return res.status(403).json({ error: UNDERAGE_MESSAGE, code: "underage" });
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -26,7 +32,7 @@ authRouter.post("/register", async (req, res) => {
 
   const passwordHash = await hashPassword(password);
   const user = await prisma.user.create({
-    data: { email, passwordHash, name, username: await usernameFromEmail(email) },
+    data: { email, passwordHash, name, username: await usernameFromEmail(email), birthDate, termsAcceptedAt: new Date() },
   });
 
   const token = signToken(user.id);

@@ -3,6 +3,7 @@ import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { AuthNavigator } from "./AuthNavigator";
 import { MainTabNavigator } from "./MainTabNavigator";
+import { AgeGateScreen } from "../screens/auth/AgeGateScreen";
 import { OnboardingScreen } from "../screens/onboarding/OnboardingScreen";
 import { LoadingView } from "../components/StateViews";
 import { colors } from "../theme/colors";
@@ -45,6 +46,8 @@ export function RootNavigator() {
     <NavigationContainer theme={navTheme}>
       {!isAuthenticated ? (
         <AuthNavigator />
+      ) : user?.ageConfirmed === false ? (
+        <AgeGateScreen />
       ) : needsOnboarding ? (
         <OnboardingScreen onDone={finishOnboarding} />
       ) : (
