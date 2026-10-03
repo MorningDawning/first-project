@@ -45,3 +45,33 @@ export function explainMatch(beer: TasteProfile, user: TasteProfile): string {
 
   return sentence;
 }
+
+export type WhyRow = { text: string; good: boolean };
+
+const GAP_TEXT: Record<keyof TasteProfile, { more: string; less: string }> = {
+  bitterness: { more: "Горчит сильнее, чем тебе обычно нравится", less: "Горчит слабее, чем тебе обычно нравится" },
+  body: { more: "Плотнее, чем ты любишь", less: "Легче, чем ты любишь" },
+  aroma: { more: "Аромат ярче, чем тебе обычно нравится", less: "Аромат скромнее, чем ты любишь" },
+  sweetness: { more: "Слаще, чем ты любишь", less: "Суше, чем ты любишь" },
+  sourness: { more: "Кислее, чем ты любишь", less: "Кислинки меньше, чем ты любишь" },
+};
+
+/**
+ * Что совпало и что нет, по осям вкуса: до двух «зелёных» строк (ось, где вкус пива и пользователя близки и
+ * у пользователя есть явное предпочтение) и одна «оранжевая» (самое большое расхождение).
+ */
+export function whyMatchRows(beer: TasteProfile, user: TasteProfile): WhyRow[] {
+  const rows = AXES.map((axis) => ({ axis, diff: Math.abs(beer[axis] - user[axis]), beerHigh: beer[axis] >= 50, strong: user[axis] >= 60 || user[axis] <= 40 }));
+  const good = rows
+    .filter((r) => r.diff <= 15 && r.strong)
+    .sort((a, b) => a.diff - b.diff)
+    .slice(0, 2)
+    .map((r): WhyRow => {
+      const trait = TRAITS[r.axis][r.beerHigh ? "high" : "low"];
+      return { text: `${trait.charAt(0).toUpperCase()}${trait.slice(1)} — как ты любишь`, good: true };
+    });
+  const worst = [...rows].sort((a, b) => b.diff - a.diff)[0];
+  const result = [...good];
+  if (worst.diff > 20) result.push({ text: GAP_TEXT[worst.axis][beer[worst.axis] > user[worst.axis] ? "more" : "less"], good: false });
+  return result;
+}

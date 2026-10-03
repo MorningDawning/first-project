@@ -8,7 +8,7 @@ export type AuthStackParamList = {
 export type HomeStackParamList = {
   Home: undefined;
   Catalog: { style?: string; focusSearch?: boolean } | undefined;
-  BeerDetail: { beerId: string };
+  BeerDetail: { beerId: string; scanned?: boolean };
   AddBeer: { barcode?: string; name?: string } | undefined;
 };
 
@@ -21,15 +21,15 @@ export type FeedStackParamList = {
   PeopleSearch: undefined;
   Dialogs: undefined;
   Chat: { chatId: string };
-  NewMessage: undefined;
+  NewMessage: { shareBeerId?: string } | undefined;
   NewGroup: { addTo?: string; exclude?: string[] } | undefined;
   GroupInfo: { chatId: string };
-  BeerDetail: { beerId: string };
+  BeerDetail: { beerId: string; scanned?: boolean };
 };
 
 export type BarStackParamList = {
   BarHome: undefined;
-  BeerDetail: { beerId: string };
+  BeerDetail: { beerId: string; scanned?: boolean };
 };
 
 export type ProfileStackParamList = {
@@ -38,7 +38,7 @@ export type ProfileStackParamList = {
   Breweries: undefined;
   BreweryDetail: { breweryId: string };
   Settings: undefined;
-  BeerDetail: { beerId: string };
+  BeerDetail: { beerId: string; scanned?: boolean };
 };
 
 export type MainTabParamList = {

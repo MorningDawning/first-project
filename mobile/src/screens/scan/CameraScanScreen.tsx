@@ -94,7 +94,7 @@ export function CameraScanScreen() {
     setCameraActive(true);
     // Результат показываем во вкладке «Главная», а не поверх камеры — так вкладка
     // «Скан» остаётся отдельным инструментом, а «Назад» с карточки ведёт на Главную.
-    navigation.navigate("HomeTab", { screen: "BeerDetail", params: { beerId } });
+    navigation.navigate("HomeTab", { screen: "BeerDetail", params: { beerId, scanned: true } });
   }
 
   function scanAgain() {
@@ -112,7 +112,7 @@ export function CameraScanScreen() {
 
   function openSuggestion(beerId: string) {
     scanAgain();
-    navigation.navigate("HomeTab", { screen: "BeerDetail", params: { beerId } });
+    navigation.navigate("HomeTab", { screen: "BeerDetail", params: { beerId, scanned: true } });
   }
 
   function searchCatalog() {

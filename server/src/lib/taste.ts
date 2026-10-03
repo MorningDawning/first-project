@@ -146,3 +146,12 @@ export async function findSimilarBeers(beer: Beer, limit = 4) {
     .sort((a, b) => b.match - a.match)
     .slice(0, limit);
 }
+
+/**
+ * Похожие пива для карточки: порядок — по близости вкуса к этому пиву, а процент в плашке — совпадение
+ * с вкусом самого пользователя (null, если вкусовой профиль ещё не построен).
+ */
+export async function recommendationsFor(beer: Beer, profile: TasteVector | null, limit = 12) {
+  const similar = await findSimilarBeers(beer, limit);
+  return similar.map((s) => ({ beer: s.beer, match: profile ? matchPercent(profile, tasteVector(s.beer)) : null }));
+}

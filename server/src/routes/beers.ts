@@ -3,9 +3,10 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { recalcBeerTaste } from "../lib/crowdTaste";
-import { computeUserTasteProfile, findSimilarBeers, matchPercent, tasteVector } from "../lib/taste";
+import { computeUserTasteProfile, matchPercent, recommendationsFor, tasteVector } from "../lib/taste";
 import { serializeBeer, serializeBeerDetail } from "../lib/serialize";
 import { fold } from "../lib/text";
+import { friendIdsOf } from "../lib/social";
 import { addBeerToCatalog } from "../lib/beerCatalog";
 
 export const beersRouter = Router();
@@ -76,14 +77,15 @@ beersRouter.get("/:id", requireAuth, async (req, res) => {
   if (!beer) return res.status(404).json({ error: "Пиво не найдено" });
 
   const profile = await computeUserTasteProfile(req.userId!);
-  const similar = await findSimilarBeers(beer, 4);
+  const similar = await recommendationsFor(beer, profile);
+  const friendIds = new Set(await friendIdsOf(req.userId!));
   const isWishlisted =
     (await prisma.wishlist.findUnique({
       where: { userId_beerId: { userId: req.userId!, beerId: beer.id } },
     })) !== null;
 
   res.json(
-    serializeBeerDetail(beer, profile ? matchPercent(profile, tasteVector(beer)) : null, similar, isWishlisted)
+    serializeBeerDetail(beer, profile ? matchPercent(profile, tasteVector(beer)) : null, similar, isWishlisted, friendIds)
   );
 });
 

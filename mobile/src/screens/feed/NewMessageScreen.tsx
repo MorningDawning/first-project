@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { Avatar } from "../../components/Avatar";
 import { BackButton } from "../../components/BackButton";
@@ -17,6 +17,7 @@ type Nav = NativeStackNavigationProp<FeedStackParamList, "NewMessage">;
 
 export function NewMessageScreen() {
   const navigation = useNavigation<Nav>();
+  const shareBeerId = useRoute<RouteProp<FeedStackParamList, "NewMessage">>().params?.shareBeerId; // пришли отправить пиво
   const [friends, setFriends] = useState<FriendItem[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -33,6 +34,7 @@ export function NewMessageScreen() {
   async function open(friend: FriendItem) {
     try {
       const chatId = await chatsApi.openDirect(friend.id);
+      if (shareBeerId) await chatsApi.send(chatId, { beerId: shareBeerId });
       navigation.replace("Chat", { chatId });
     } catch (e) {
       Alert.alert("Не получилось", apiErrorMessage(e));
@@ -46,7 +48,7 @@ export function NewMessageScreen() {
     <Screen>
       <View style={styles.topBar}>
         <BackButton onPress={() => navigation.goBack()} />
-        <Text style={styles.title}>Кому написать</Text>
+        <Text style={styles.title}>{shareBeerId ? "Кому отправить пиво" : "Кому написать"}</Text>
       </View>
       <View style={styles.search}>
         <Icon name="search" color={colors.textMuted} size={18} strokeWidth={2.75} />
@@ -70,7 +72,7 @@ export function NewMessageScreen() {
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
-            !q ? (
+            !q && !shareBeerId ? (
               <Pressable onPress={() => navigation.navigate("NewGroup")} style={({ pressed }) => [styles.row, styles.groupRow, pressed && { opacity: 0.85 }]}>
                 <View style={styles.groupIcon}>
                   <Icon name="users" color={colors.background} size={22} />

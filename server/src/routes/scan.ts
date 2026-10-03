@@ -2,8 +2,9 @@ import { Router } from "express";
 import multer from "multer";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
-import { computeUserTasteProfile, findSimilarBeers, matchPercent, tasteVector } from "../lib/taste";
+import { computeUserTasteProfile, matchPercent, recommendationsFor, tasteVector } from "../lib/taste";
 import { serializeBeerDetail } from "../lib/serialize";
+import { friendIdsOf } from "../lib/social";
 import { recognizeLabel } from "../lib/mlRecognition";
 import { lookupBarcode } from "../lib/openFoodFacts";
 import { addBeerToCatalog } from "../lib/beerCatalog";
@@ -90,7 +91,7 @@ scanRouter.post("/", requireAuth, upload.single("photo"), async (req, res) => {
 
   const profile = await computeUserTasteProfile(req.userId!);
   const match = profile ? matchPercent(profile, tasteVector(full)) : null;
-  const similar = await findSimilarBeers(full, 4);
+  const similar = await recommendationsFor(full, profile);
 
-  res.status(201).json(serializeBeerDetail(full, match, similar));
+  res.status(201).json(serializeBeerDetail(full, match, similar, false, new Set(await friendIdsOf(req.userId!))));
 });

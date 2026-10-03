@@ -38,6 +38,7 @@ export type Review = {
   rating: number;
   text: string | null;
   tags: string[];
+  isFriend: boolean; // отзыв человека из друзей
   createdAt: string;
   user: { id: string; name: string; avatarUrl: string | null };
 };

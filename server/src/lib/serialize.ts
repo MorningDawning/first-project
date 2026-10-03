@@ -32,8 +32,9 @@ export function serializeBeer(beer: BeerWithBrewery, matchPercent: number | null
 export function serializeBeerDetail(
   beer: BeerWithReviews,
   matchPercent: number | null,
-  recommendations: { beer: BeerWithBrewery; match: number }[],
-  isWishlisted = false
+  recommendations: { beer: BeerWithBrewery; match: number | null }[],
+  isWishlisted = false,
+  friendIds: Set<string> = new Set()
 ) {
   return {
     ...serializeBeer(beer, matchPercent, isWishlisted),
@@ -46,6 +47,7 @@ export function serializeBeerDetail(
       rating: r.rating,
       text: r.text,
       tags: JSON.parse(r.tags) as string[],
+      isFriend: friendIds.has(r.user.id), // отзыв человека из друзей смотрящего
       createdAt: r.createdAt,
       user: { id: r.user.id, name: r.user.name, avatarUrl: r.user.avatarUrl },
     })),
