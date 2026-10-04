@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+dataset/*/*.jpg
+dataset/*/*.jpeg
+dataset/*/*.png
+!dataset/*/.gitkeep
+
+gallery.npz
+gallery.json
+dataset/*/SOURCES.txt
+inbox/

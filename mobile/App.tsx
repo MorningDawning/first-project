@@ -1,0 +1,50 @@
+import React, { useEffect } from "react";
+import { StatusBar } from "expo-status-bar";
+import { View } from "react-native";
+import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
+import { Caprasimo_400Regular } from "@expo-google-fonts/caprasimo";
+import { Rubik_500Medium } from "@expo-google-fonts/rubik";
+import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold } from "@expo-google-fonts/manrope";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AuthProvider } from "./src/context/AuthContext";
+import { RootNavigator } from "./src/navigation/RootNavigator";
+import { RealtimeProvider } from "./src/lib/realtime";
+import { colors } from "./src/theme/colors";
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    Caprasimo_400Regular,
+    Rubik_500Medium,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+  });
+  // useFonts возвращает [loaded, error] — раньше мы читали только loaded,
+  // и при ошибке загрузки шрифтов (а не просто "ещё грузится") приложение
+  // навсегда зависало на пустом экране без единого намёка на причину.
+  const ready = fontsLoaded || !!fontError;
+
+  useEffect(() => {
+    if (fontError) console.error("Не удалось загрузить шрифты:", fontError);
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready, fontError]);
+
+  if (!ready) return null;
+
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <RealtimeProvider>
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <RootNavigator />
+          </View>
+          <StatusBar style="dark" />
+        </RealtimeProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}

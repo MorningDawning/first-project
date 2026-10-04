@@ -1,0 +1,74 @@
+{
+  "punk-ipa": {
+    "beer": "Punk IPA",
+    "brewery": "BrewDog"
+  },
+  "hazy-jane": {
+    "beer": "Hazy Jane",
+    "brewery": "BrewDog"
+  },
+  "pale-ale": {
+    "beer": "Pale Ale",
+    "brewery": "Sierra Nevada"
+  },
+  "porter": {
+    "beer": "Porter",
+    "brewery": "Sierra Nevada"
+  },
+  "draught": {
+    "beer": "Draught",
+    "brewery": "Guinness"
+  },
+  "foreign-extra-stout": {
+    "beer": "Foreign Extra Stout",
+    "brewery": "Guinness"
+  },
+  "hefeweissbier": {
+    "beer": "Hefeweissbier",
+    "brewery": "Weihenstephaner"
+  },
+  "kristallweizen": {
+    "beer": "Kristallweizen",
+    "brewery": "Weihenstephaner"
+  },
+  "duvel": {
+    "beer": "Duvel",
+    "brewery": "Duvel Moortgat"
+  },
+  "tripel-hop": {
+    "beer": "Tripel Hop",
+    "brewery": "Duvel Moortgat"
+  },
+  "salvator": {
+    "beer": "Salvator",
+    "brewery": "Paulaner"
+  },
+  "original-pilsner": {
+    "beer": "Original Pilsner",
+    "brewery": "Paulaner"
+  },
+  "super-dry": {
+    "beer": "Super Dry",
+    "brewery": "Asahi"
+  },
+  "asahi-black": {
+    "beer": "Asahi Black",
+    "brewery": "Asahi"
+  },
+  "imperial-stout": {
+    "beer": "Imperial Stout",
+    "brewery": "Северный ветер"
+  },
+  "medovyy-el": {
+    "beer": "Медовый Эль",
+    "brewery": "Северный ветер"
+  },
+  "baltiyskiy-porter": {
+    "beer": "Балтийский Портер",
+    "brewery": "Северный ветер"
+  },
+  "rose-lambic": {
+    "beer": "Rosé Lambic",
+    "brewery": "Duvel Moortgat"
+  }
+}
