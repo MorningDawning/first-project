@@ -135,7 +135,7 @@ async function main() {
       style: c.style,
       abv: c.abv ?? 5,
       barcode: c.barcode,
-      imageUrl: c.imageUrl,
+      imageUrl: null, // картинки в приложении только свои (ml/inbox → вырезка → sync-photos); фото из Open Food Facts идут лишь в галерею распознавания
       description: `${c.style}.${c.abv ? "" : " Крепость указана приблизительно."} Данные из Open Food Facts; вкус оценён по типичному для стиля.`,
     });
     if (isNew) created++;
@@ -153,14 +153,13 @@ async function main() {
           path.join(DATASET_DIR, slug, "SOURCES.txt"),
           `off-${c.barcode}.jpg\thttps://world.openfoodfacts.org/product/${c.barcode}\tOpen Food Facts, CC BY-SA 3.0\n`
         );
-        await prisma.beer.update({ where: { id: beer.id }, data: { imageUrl: `/beer-photos/${slug}/off-${c.barcode}.jpg` } });
       }
     }
   }
   writeLabels(labels);
 
-  console.log(`\nГотово: новых пив в каталоге ${created}, всего в labels.json ${Object.keys(labels).length}, фото упаковок скачано ${photos}.`);
-  console.log("Дальше: cd ml && python make_cutouts.py && python build_gallery.py, затем в server: npm run sync-photos:local");
+  console.log(`\nГотово: новых пив в каталоге ${created}, всего в labels.json ${Object.keys(labels).length}, фото для галереи распознавания скачано ${photos} (в приложении они не показываются).`);
+  console.log("Дальше: cd ml && python build_gallery.py. Свои фото для приложения: положите в ml/inbox и python import_inbox.py --cut");
 }
 
 main()

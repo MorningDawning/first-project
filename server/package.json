@@ -21,7 +21,9 @@
     "export-labels:local": "node scripts/local.js tsx src/scripts/exportLabels.ts",
     "import-beers": "tsx src/scripts/importBeers.ts",
     "import-beers:local": "node scripts/local.js tsx src/scripts/importBeers.ts",
-    "sync-photos:local": "node scripts/local.js tsx src/scripts/syncBeerPhotos.ts"
+    "sync-photos:local": "node scripts/local.js tsx src/scripts/syncBeerPhotos.ts",
+    "clear-photos": "tsx src/scripts/clearPhotos.ts",
+    "clear-photos:local": "node scripts/local.js tsx src/scripts/clearPhotos.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

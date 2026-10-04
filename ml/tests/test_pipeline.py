@@ -255,7 +255,7 @@ def test_cutout_rejects_busy_background():
 
 def test_make_cutouts_script_and_gallery_ignores_cutout(dataset):
     _can_on((255, 255, 255)).save(dataset / "red-lager" / "big.jpg")
-    subprocess.run([sys.executable, "make_cutouts.py", "--data", str(dataset), "--mode", "floodfill", "--only", "red-lager"],
+    subprocess.run([sys.executable, "make_cutouts.py", "--data", str(dataset), "--mode", "floodfill", "--only", "red-lager", "--any"],
                    cwd=ML_DIR, check=True, capture_output=True, text=True)
     assert (dataset / "red-lager" / "big.jpg").exists() and (dataset / "red-lager" / "cutout.png").exists()
     from common import list_photos
@@ -358,3 +358,14 @@ def test_import_inbox_matches_names_and_places_front(dataset):
     assert (dataset / "red-lager" / "front.jpg").exists()
     assert (inbox / "done" / "Red Lager.jpg").exists() and (inbox / "неведомая штука.jpg").exists()
     assert "не разобрано" in result.stdout
+
+
+def test_make_cutouts_uses_only_own_front_photo_by_default(dataset):
+    _can_on((255, 255, 255)).save(dataset / "red-lager" / "off-1.jpg")
+    run = lambda *extra: subprocess.run([sys.executable, "make_cutouts.py", "--data", str(dataset), "--mode", "floodfill", "--only", "red-lager", *extra],
+                                        cwd=ML_DIR, check=True, capture_output=True, text=True)
+    run()
+    assert not (dataset / "red-lager" / "cutout.png").exists()   # фото Open Food Facts без --any не вырезаются
+    _can_on((255, 255, 255)).save(dataset / "red-lager" / "front.jpg")
+    run()
+    assert (dataset / "red-lager" / "cutout.png").exists()       # своё фото вырезается

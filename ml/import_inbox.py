@@ -2,8 +2,8 @@
 Раскладывает ваши «идеальные» фото упаковок (например, сохранённые из интернет-магазина) по сортам каталога.
 
     1. Положите фото в папку ml/inbox/ и назовите файл по пиву: «Балтика 7.jpg», «Bud Original.png», «Hoegaarden - Белое.jpg».
-    2. python import_inbox.py
-    3. python make_cutouts.py --force --preview
+    2. python import_inbox.py --cut        (разложит фото и сразу вырежет фон)
+    3. в папке server: npm run sync-photos:local   (картинки появятся в приложении)
 
 Скрипт ищет в labels.json сорт, название которого больше всего совпадает с именем файла, и копирует фото в
 dataset/<папка сорта>/front.jpg. Такое фото используется вместо фото из Open Food Facts. Если совпадение
@@ -17,6 +17,8 @@ import argparse
 import pathlib
 import re
 import shutil
+import subprocess
+import sys
 
 from PIL import Image
 
@@ -59,6 +61,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data", default="dataset")
     parser.add_argument("--inbox", default="inbox")
+    parser.add_argument("--cut", action="store_true", help="Сразу вырезать фон у разложенных фото (make_cutouts.py --force --preview)")
     args = parser.parse_args()
 
     data_dir, inbox = pathlib.Path(args.data), pathlib.Path(args.inbox)
@@ -71,6 +74,7 @@ def main() -> None:
 
     done_dir = inbox / "done"
     placed, skipped = 0, []
+    slugs: list[str] = []
     for path in files:
         # Имя файла может совпасть с папкой сорта напрямую (например, punk-ipa.jpg)
         slug, note = (path.stem, "ok") if path.stem in labels else match(path.stem, labels)
@@ -86,12 +90,16 @@ def main() -> None:
         done_dir.mkdir(exist_ok=True)
         shutil.move(str(path), str(done_dir / path.name))
         placed += 1
+        slugs.append(slug)
         print(f"  {path.name} → {slug} ({labels[slug]['brewery']} — {labels[slug]['beer']})")
 
     print(f"\nРазложено фото: {placed}, осталось в inbox: {len(skipped)}.")
     for name, why in skipped:
         print(f"  не разобрано: {name} — {why}")
-    if placed:
+    if placed and args.cut:
+        print("\nВырезаем фон…")
+        subprocess.run([sys.executable, "make_cutouts.py", "--data", args.data, "--force", "--preview", "--only", ",".join(slugs)], check=False)
+    elif placed:
         print("Дальше: python make_cutouts.py --force --preview")
 
 

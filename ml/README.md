@@ -51,7 +51,7 @@ npm run import-beers:local -- --dry-run          # посмотреть, что 
 npm run import-beers:local -- --country=russia --limit=300 --world=100
 cd ../ml
 pip install -r requirements-cutout.txt            # один раз: нейросеть для вырезки (скачает модель, нужен VPN)
-python make_cutouts.py --force --preview          # вырезать банки и сохранить cutout-preview.jpg
+python import_inbox.py --cut                      # свои фото из ml/inbox: разложить по сортам и вырезать фон
 python build_gallery.py                           # собрать галерею для распознавания
 cd ../server
 npm run sync-photos:local                         # подставить картинки в каталог
@@ -73,7 +73,11 @@ npm run dev:local
   `python make_cutouts.py --force --only <папка сорта>`: своё фото берётся первым.
   Много своих фото удобнее разложить скриптом: положите их в `ml/inbox/`, назвав по пиву («Балтика 7.jpg»,
   «Hoegaarden Белое.jpg»), и выполните `python import_inbox.py`. Он сам найдёт сорт в каталоге; что не
-  распознал, оставит в `inbox/` и назовёт в отчёте. Дальше `python make_cutouts.py --force --preview`.
+  распознал, оставит в `inbox/` и назовёт в отчёте. С флагом `--cut` фон вырезается сразу.
+- В приложении показываются только ваши картинки: вырезка `cutout.png`, сделанная из вашего фото `front.*`.
+  Фото Open Food Facts нужны только для распознавания, в приложении их нет. Чтобы начать с чистого листа:
+  `npm run clear-photos:local` в папке `server` (убирает картинки из приложения и удаляет вырезки;
+  `-- --originals` удаляет ещё и скачанные фото Open Food Facts, `-- --front` ещё и ваши фото).
 - Запускать импорт повторно безопасно: то, что уже есть, пропускается. Для другой страны:
   `--country=belarus` или несколько через запятую.
 

@@ -4,7 +4,8 @@
 
     python make_cutouts.py --data dataset
 
-Для каждой папки dataset/<марка>/ берётся самое крупное фото и сохраняется как cutout.png в той же папке.
+Для каждой папки dataset/<марка>/ берётся ваше фото front.* (его кладёт import_inbox.py) и сохраняется как cutout.png в той же папке.
+Фото из Open Food Facts по умолчанию не вырезаются: добавьте --any, если нужно и их.
 Потом в server: npm run sync-photos:local, и приложение начнёт показывать вырезки.
 
 Режимы (--mode):
@@ -271,12 +272,13 @@ def _crop_with_padding(image: Image.Image, box: tuple[int, int, int, int]) -> Im
     return image.crop(box)
 
 
-def pick_source(folder: pathlib.Path) -> tuple[pathlib.Path, Image.Image] | None:
-    """Самое крупное фото в папке."""
+def pick_source(folder: pathlib.Path, any_photo: bool = False) -> tuple[pathlib.Path, Image.Image] | None:
+    """Своё фото (front.*) из папки сорта. С any_photo, если своего нет, берётся самое крупное из остальных."""
     best = None
     photos = list_photos(folder)
     manual = [p for p in photos if p.stem.lower() in MANUAL_NAMES]
-    for path in manual or photos:
+    candidates = manual or (photos if any_photo else [])
+    for path in candidates:
         image = open_image(path)
         if image is not None and (best is None or image.width * image.height > best[1].width * best[1].height):
             best = (path, image)
@@ -305,7 +307,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data", default="dataset")
     parser.add_argument("--mode", default="auto", choices=["auto", "floodfill", "grabcut", "rembg", "birefnet"])
-    parser.add_argument("--only", help="Только эта папка")
+    parser.add_argument("--only", help="Только эти папки (через запятую)")
+    parser.add_argument("--any", action="store_true", help="Если своего фото front.* нет, вырезать из любого (например, из фото Open Food Facts)")
     parser.add_argument("--force", action="store_true", help="Переделать, даже если cutout.png уже есть")
     parser.add_argument("--preview", action="store_true", help="Сохранить cutout-preview.jpg: оригиналы и вырезки рядом")
     parser.add_argument("--preview-count", type=int, default=24, help="Сколько пар показать в превью")
@@ -333,19 +336,20 @@ def main() -> None:
     print(f"Режим: {mode}")
 
     data_dir = pathlib.Path(args.data)
+    only = {x.strip() for x in args.only.split(",")} if args.only else None
     done = existing = 0
     failed: list[tuple[str, str]] = []
     no_photo: list[str] = []
     preview: list[tuple[str, Image.Image, Image.Image | None]] = []
     for slug in load_labels(data_dir):
-        if args.only and slug != args.only:
+        if only and slug not in only:
             continue
         folder = data_dir / slug
         target = folder / "cutout.png"
         if target.exists() and not args.force:
             existing += 1
             continue
-        source = pick_source(folder)
+        source = pick_source(folder, args.any)
         if source is None:
             no_photo.append(slug)
             continue

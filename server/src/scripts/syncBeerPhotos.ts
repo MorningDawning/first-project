@@ -1,8 +1,9 @@
 /**
  * Подтягивает фото пива из ml/dataset/ в beer.imageUrl.
  *
- * Для каждой марки берётся «студийная» вырезка cutout.png (её делает ml/make_cutouts.py), а если её ещё нет,
- * первое фото из папки. Записывается путь вида "/beer-photos/<папка>/<файл>": сервер отдаёт ml/dataset статикой
+ * Для каждой марки берётся «студийная» вырезка cutout.png (её делает ml/make_cutouts.py), а если вырезки нет,
+ * своё фото front.* (его кладёт ml/import_inbox.py). Фото из Open Food Facts (off-*.jpg) в приложении не показываются:
+ * они нужны только для распознавания. Записывается путь вида "/beer-photos/<папка>/<файл>": сервер отдаёт ml/dataset статикой
  * (см. src/index.ts), а приложение само достраивает адрес до полного (см. resolveMediaUrl в mobile/src/api/config.ts).
  *
  * Запуск: npm run sync-photos:local (можно повторять сколько угодно раз, ничего не ломает).
@@ -35,7 +36,7 @@ async function main() {
       .readdirSync(folder)
       .filter((f) => IMAGE_EXTENSIONS.includes(path.extname(f).toLowerCase()))
       .sort();
-    const file = files.includes("cutout.png") ? "cutout.png" : files.find((f) => !f.startsWith("cutout"));
+    const file = files.includes("cutout.png") ? "cutout.png" : files.find((f) => /^front\./i.test(f));
     if (!file) {
       skipped++;
       continue;
